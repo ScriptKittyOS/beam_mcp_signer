@@ -4,7 +4,7 @@
 defmodule BeamMCP.Signer.Ed25519.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.1.1"
   @source_url "https://github.com/ScriptKittyOS/beam_mcp_signer"
 
   # The same floor as beam_mcp: the behaviour this package implements lives there, and one
@@ -33,11 +33,13 @@ defmodule BeamMCP.Signer.Ed25519.MixProject do
 
   defp deps do
     [
-      # The behaviour, `BeamMCP.Signer`, is public in beam_mcp from 0.7.0. Three numbers, as
-      # core's README asks: while core is 0.x a documented break may land at the next minor,
-      # and a two-number requirement would carry this package across it. Nothing else: Ed25519
-      # is OTP's.
-      {:beam_mcp, "~> 0.7.0"},
+      # The behaviour, `BeamMCP.Signer`, is public in beam_mcp from 0.7.0 and frozen from
+      # there: core's own rule says its public surface does not move again before 1.0.0, and
+      # this package touches nothing but that behaviour and `Canonical.signature/3`'s bytes.
+      # So two numbers here, on purpose: the requirement spans core's 0.7, 0.8 and any 0.9,
+      # stops at 1.0.0, and a host is not held on the previous core minor by this package
+      # (0.1.0's `~> 0.7.0` did exactly that at core's 0.8.0). Nothing else: Ed25519 is OTP's.
+      {:beam_mcp, "~> 0.7"},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}
     ]
   end
