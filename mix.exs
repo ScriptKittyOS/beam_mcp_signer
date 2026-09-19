@@ -33,11 +33,11 @@ defmodule BeamMCP.Signer.Ed25519.MixProject do
 
   defp deps do
     [
-      # The behaviour, `BeamMCP.Signer`, arrived in beam_mcp after 0.6.0 and is not on hex.pm
-      # yet: pinned to the commit that carries it until 0.7.0 is published, when this line
-      # becomes `{:beam_mcp, "~> 0.7"}`. Nothing else: Ed25519 is OTP's.
-      {:beam_mcp,
-       github: "ScriptKittyOS/beam_mcp", ref: "7c1babb2a81e8932e4c30c9bb9a5d4284269a314"},
+      # The behaviour, `BeamMCP.Signer`, is public in beam_mcp from 0.7.0. Three numbers, as
+      # core's README asks: while core is 0.x a documented break may land at the next minor,
+      # and a two-number requirement would carry this package across it. Nothing else: Ed25519
+      # is OTP's.
+      {:beam_mcp, "~> 0.7.0"},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}
     ]
   end
