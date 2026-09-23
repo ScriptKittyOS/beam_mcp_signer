@@ -15,12 +15,13 @@ apply here, and this page says what is particular to this repository.
 
 | role | who | responsibilities |
 |---|---|---|
-| **Maintainer** | one person: the ScriptKittyOS organization's administrator, the hex.pm owner of `beam_mcp_signer` (account `aylacroft`), and the address in `SECURITY.md` | decides what lands and when; reviews every pull request; keeps CI green; answers security reports on `SECURITY.md`'s commitments; tags (signed) and publishes releases; keeps this page, the roadmap and the CHANGELOG true |
+| **Maintainer** | one person: the ScriptKittyOS organization's administrator, the `full` hex.pm owner of `beam_mcp_signer` (account `aylacroft`), and the address in `SECURITY.md` | decides what lands and when; reviews every pull request; keeps CI green; answers security reports on `SECURITY.md`'s commitments; tags (signed) and publishes releases; keeps this page, the roadmap and the CHANGELOG true |
+| **Continuity holders** | two people, from 2026-09-23, the same as on `beam_mcp`: `znmead`, the Maintain role on this repository; Mike Hostetler (`mikehostetler`), `maintainer` ownership of `beam_mcp_signer` on hex.pm, invited to Maintain here too | if the maintainer cannot act, keep the project going within a week between them: triage and close issues, merge pull requests once CI is green, tag (signed with their own key, announced in the CHANGELOG with its fingerprint) and publish releases; decide nothing while the maintainer can |
 | **Contributor** | anyone | proposes changes by pull request under `CONTRIBUTING.md`: signed off, tested, green; reports bugs and enhancements as issues; reports vulnerabilities privately |
 
 There is no steering group and no vote. A decision is the maintainer's and is recorded in the
-tree (a CHANGELOG entry, a page, a test) or it was not made. The bus factor is one, stated
-rather than hidden.
+tree (a CHANGELOG entry, a page, a test) or it was not made. Access is held twice; knowledge
+is held once, so the bus factor is one, stated rather than hidden.
 
 ## How a change lands
 
@@ -38,7 +39,9 @@ the assurance case changes in the same pull request.
 
 ## If the maintainer stops
 
-`beam_mcp`'s succession page applies as written: the repository is public and forkable under
-the organization, published releases stay on hex.pm, and a successor needs organization
-ownership, `mix hex.owner add beam_mcp_signer` from the current owner (or hex.pm's support
-process), and nothing else: this package holds no secret of its own.
+The continuity holders above can triage, merge and release without the maintainer.
+`beam_mcp`'s succession page applies as written, including what their access does not reach:
+this repository's settings, adding collaborators, and adding owners on hex.pm stay with the
+maintainer (the organization's owner, the package's `full` owner), and so does the security
+intake `SECURITY.md` names. The repository is public and forkable under the organization,
+published releases stay on hex.pm, and this package holds no secret of its own.
