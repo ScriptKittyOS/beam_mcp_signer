@@ -24,7 +24,18 @@ defmodule BeamMCP.Signer.Ed25519.MixProject do
       description:
         "Ed25519 signer for beam_mcp's canonical connectome bytes, through OTP's :crypto; the host hands the key in",
       source_url: @source_url,
-      docs: [main: "readme", extras: ["README.md", "CHANGELOG.md"]],
+      docs: [
+        main: "readme",
+        extras: [
+          "README.md",
+          "CHANGELOG.md",
+          "SECURITY.md",
+          "docs/architecture.md",
+          "docs/assurance-case.md",
+          "docs/roadmap.md",
+          "docs/verifying-releases.md"
+        ]
+      ],
       aliases: [check_otp: &check_otp!/1]
     ]
   end
@@ -40,7 +51,8 @@ defmodule BeamMCP.Signer.Ed25519.MixProject do
       # stops at 1.0.0, and a host is not held on the previous core minor by this package
       # (0.1.0's `~> 0.7.0` did exactly that at core's 0.8.0). Nothing else: Ed25519 is OTP's.
       {:beam_mcp, "~> 0.7"},
-      {:ex_doc, "~> 0.34", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -49,7 +61,9 @@ defmodule BeamMCP.Signer.Ed25519.MixProject do
       name: "beam_mcp_signer",
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => @source_url, "beam_mcp" => "https://github.com/ScriptKittyOS/beam_mcp"},
-      files: ~w(lib mix.exs README.md CHANGELOG.md LICENSE NOTICE)
+      # Globs, not a directory: a directory in `files:` is walked in readdir order, which differs
+      # between filesystems, so the tarball would be the machine's (tools/release_tarball.sh).
+      files: ~w(lib/**/*.ex mix.exs README.md CHANGELOG.md LICENSE NOTICE)
     ]
   end
 

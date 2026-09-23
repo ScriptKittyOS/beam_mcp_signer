@@ -7,6 +7,19 @@ SPDX-License-Identifier: Apache-2.0
 
 ## [Unreleased]
 
+### Added: the project's pages and checks (no code change)
+
+- `SECURITY.md` (private reporting, commitments, what a host can rely on, one known limit),
+  `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1, CC-BY-4.0 in
+  `LICENSES/`), `GOVERNANCE.md`, and `docs/`: architecture, assurance case, roadmap,
+  verifying a release (the tag-signing key's fingerprint). The pages are in the docs extras.
+- CI: `mix credo --strict` (Credo as a dev/test dependency; `.credo.exs` adds `UnsafeToAtom`
+  and `LeakyEnvironment` on `lib/`), `mix hex.audit`, and a DCO sign-off check on every
+  commit. Dependabot weekly for Mix and GitHub Actions.
+- `tools/release_tarball.sh`, beam_mcp's canonical-tarball script, and `files:` in `mix.exs`
+  as globs, so a release's bytes are the same on every machine.
+- README: the OpenSSF Best Practices badge and links to the pages above.
+
 ## [0.1.1] — 2026-09-19
 
 ### Changed

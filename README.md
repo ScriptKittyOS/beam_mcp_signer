@@ -5,6 +5,8 @@ SPDX-License-Identifier: Apache-2.0
 
 # beam_mcp_signer
 
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14775/badge)](https://www.bestpractices.dev/projects/14775)
+
 An Ed25519 signer for [`beam_mcp`](https://github.com/ScriptKittyOS/beam_mcp)'s canonical
 connectome bytes, through OTP's `:crypto`. One module, `BeamMCP.Signer.Ed25519`, implementing
 core's `BeamMCP.Signer` behaviour (`sign/2`).
@@ -32,3 +34,12 @@ not a dependency of this package in the other direction, and it never will be. A
 wants signatures adds this package and attaches the module; one that does not, does not.
 
 Apache-2.0. Erlang/OTP 27 or newer, Elixir 1.17 or newer -- the same floor as core.
+
+**The project.** Reference documentation is on [HexDocs](https://hexdocs.pm/beam_mcp_signer).
+What a host can rely on, and how to report a vulnerability: [`SECURITY.md`](SECURITY.md). Why
+the security requirements hold: [`docs/assurance-case.md`](docs/assurance-case.md), with the
+design in [`docs/architecture.md`](docs/architecture.md). Checking a release's signature:
+[`docs/verifying-releases.md`](docs/verifying-releases.md). Contributing:
+[`CONTRIBUTING.md`](CONTRIBUTING.md), under the [Code of Conduct](CODE_OF_CONDUCT.md). Who
+decides, and what comes next: [`GOVERNANCE.md`](GOVERNANCE.md),
+[`docs/roadmap.md`](docs/roadmap.md). Bugs and ideas: [issues](https://github.com/ScriptKittyOS/beam_mcp_signer/issues).
