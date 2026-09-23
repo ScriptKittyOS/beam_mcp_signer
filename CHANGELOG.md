@@ -7,6 +7,13 @@ SPDX-License-Identifier: Apache-2.0
 
 ## [Unreleased]
 
+### Added: gold groundwork (no code change)
+
+- `docs/security-review.md`: how a security review of this package is done, a checklist centred
+  on the key, and its record, empty until the first review. `CONTRIBUTING.md`: a code-review
+  section. REUSE compliance: `.gitignore` headed, `.tool-versions`, `mix.lock` and `NOTICE`
+  with `.license` sidecars, `LICENSES/Apache-2.0.txt`, and `reuse lint` in CI.
+
 ### Changed: governance (no code change)
 
 - `GOVERNANCE.md` names two continuity holders, as on `beam_mcp`: `znmead` (the Maintain role
