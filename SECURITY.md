@@ -79,6 +79,7 @@ the GitHub Advisory Database and OSV, which `mix hex.audit` reads.
 
 | version | supported |
 |---|---|
-| `0.1.x` | yes |
+| `0.2.x` | yes |
+| `0.1.x` | no, superseded (the key could reach an exception report; see the 0.2.0 CHANGELOG entry) |
 
 Fixes land on the latest release.

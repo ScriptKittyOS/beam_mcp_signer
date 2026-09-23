@@ -7,6 +7,44 @@ SPDX-License-Identifier: Apache-2.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-23
+
+A security fix and an addition, placed at the minor (0.x): the private key no longer reaches an
+exception report. Upgrade from `0.1.x` by changing the requirement to `~> 0.2.0`; pass the key as
+`private_key: fn -> key end`. Core requirement unchanged (`~> 0.7`, which admits `beam_mcp`
+0.7 to 0.10).
+
+### Changed: a mistyped call is answered, never raised
+
+- A mistyped call to `sign/2` (bytes that are not a binary, options that are not a list) is
+  answered `{:error, :bad_arguments}` instead of raising `FunctionClauseError`. Found by this
+  package's own audit: the raised error printed its arguments, the private key among them
+  (`sign("bytes", %{private_key: key})` printed all 32 bytes). **How to tell whether you are
+  affected:** only code that rescued `FunctionClauseError` from `sign/2` sees a difference;
+  a call through `Canonical.signature/3` with a keyword list never reached that clause.
+
+### Added: the key by reference
+
+- `:private_key` may be a zero-arity function returning the 32-byte key
+  (`private_key: fn -> key end`), and the README now passes it that way. Anything that prints
+  the options (an exception, a log line, a crash report) prints `#Function<...>` in place of
+  the key's bytes, including an exception raised in `beam_mcp`'s `Canonical.signature/3` on a
+  mistyped call. A function that does not return 32 bytes is `{:error, {:private_key,
+  :not_32_bytes}}`, as a key that is not 32 bytes is.
+
+### Added: the project's pages and checks (no code change)
+
+- `SECURITY.md` (private reporting, commitments, what a host can rely on, one known limit),
+  `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1, CC-BY-4.0 in
+  `LICENSES/`), `GOVERNANCE.md`, and `docs/`: architecture, assurance case, roadmap,
+  verifying a release (the tag-signing key's fingerprint). The pages are in the docs extras.
+- CI: `mix credo --strict` (Credo as a dev/test dependency; `.credo.exs` adds `UnsafeToAtom`
+  and `LeakyEnvironment` on `lib/`), `mix hex.audit`, and a DCO sign-off check on every
+  commit. Dependabot weekly for Mix and GitHub Actions.
+- `tools/release_tarball.sh`, beam_mcp's canonical-tarball script, and `files:` in `mix.exs`
+  as globs, so a release's bytes are the same on every machine.
+- README: the OpenSSF Best Practices badge and links to the pages above.
+
 ### Added: gold groundwork (no code change)
 
 - `docs/security-review.md`: how a security review of this package is done, a checklist centred
@@ -22,38 +60,7 @@ SPDX-License-Identifier: Apache-2.0
   Mike Hostetler has since accepted Maintain here too; the organization requires secure
   two-factor authentication.
 
-### Added
-
-- `:private_key` may be a zero-arity function returning the 32-byte key
-  (`private_key: fn -> key end`), and the README now passes it that way. Anything that prints
-  the options (an exception, a log line, a crash report) prints `#Function<...>` in place of
-  the key's bytes, including an exception raised in `beam_mcp`'s `Canonical.signature/3` on a
-  mistyped call. A function that does not return 32 bytes is `{:error, {:private_key,
-  :not_32_bytes}}`, as a key that is not 32 bytes is.
-
-### Changed
-
-- A mistyped call to `sign/2` (bytes that are not a binary, options that are not a list) is
-  answered `{:error, :bad_arguments}` instead of raising `FunctionClauseError`. Found by this
-  package's own audit: the raised error printed its arguments, the private key among them
-  (`sign("bytes", %{private_key: key})` printed all 32 bytes). **How to tell whether you are
-  affected:** only code that rescued `FunctionClauseError` from `sign/2` sees a difference;
-  a call through `Canonical.signature/3` with a keyword list never reached that clause.
-
-### Added: the project's pages and checks (no code change)
-
-- `SECURITY.md` (private reporting, commitments, what a host can rely on, one known limit),
-  `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1, CC-BY-4.0 in
-  `LICENSES/`), `GOVERNANCE.md`, and `docs/`: architecture, assurance case, roadmap,
-  verifying a release (the tag-signing key's fingerprint). The pages are in the docs extras.
-- CI: `mix credo --strict` (Credo as a dev/test dependency; `.credo.exs` adds `UnsafeToAtom`
-  and `LeakyEnvironment` on `lib/`), `mix hex.audit`, and a DCO sign-off check on every
-  commit. Dependabot weekly for Mix and GitHub Actions.
-- `tools/release_tarball.sh`, beam_mcp's canonical-tarball script, and `files:` in `mix.exs`
-  as globs, so a release's bytes are the same on every machine.
-- README: the OpenSSF Best Practices badge and links to the pages above.
-
-## [0.1.1] — 2026-09-19
+## [0.1.1] - 2026-09-19
 
 ### Changed
 
@@ -63,7 +70,7 @@ SPDX-License-Identifier: Apache-2.0
   package uses nothing outside the `BeamMCP.Signer` behaviour and the canonical bytes, so the
   wider requirement is safe until core's `1.0.0`. No code changes.
 
-## [0.1.0] — 2026-09-19
+## [0.1.0] - 2026-09-19
 
 ### Added
 
