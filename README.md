@@ -48,6 +48,6 @@ What a host can rely on, and how to report a vulnerability: [`SECURITY.md`](SECU
 the security requirements hold: [`docs/assurance-case.md`](docs/assurance-case.md), with the
 design in [`docs/architecture.md`](docs/architecture.md). Checking a release's signature:
 [`docs/verifying-releases.md`](docs/verifying-releases.md). Contributing:
-[`CONTRIBUTING.md`](CONTRIBUTING.md), under the [Code of Conduct](CODE_OF_CONDUCT.md). Who
-decides, and what comes next: [`GOVERNANCE.md`](GOVERNANCE.md),
+[`CONTRIBUTING.md`](https://github.com/ScriptKittyOS/beam_mcp_signer/blob/main/CONTRIBUTING.md), under the [Code of Conduct](https://github.com/ScriptKittyOS/beam_mcp_signer/blob/main/CODE_OF_CONDUCT.md). Who
+decides, and what comes next: [`GOVERNANCE.md`](https://github.com/ScriptKittyOS/beam_mcp_signer/blob/main/GOVERNANCE.md),
 [`docs/roadmap.md`](docs/roadmap.md). Bugs and ideas: [issues](https://github.com/ScriptKittyOS/beam_mcp_signer/issues).
