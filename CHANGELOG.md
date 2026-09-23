@@ -19,6 +19,8 @@ SPDX-License-Identifier: Apache-2.0
 - `GOVERNANCE.md` names two continuity holders, as on `beam_mcp`: `znmead` (the Maintain role
   on this repository) and Mike Hostetler (`maintainer` ownership on hex.pm; invited to
   Maintain), what that covers and what it does not. The bus factor stays one for knowledge.
+  Mike Hostetler has since accepted Maintain here too; the organization requires secure
+  two-factor authentication.
 
 ### Added
 
