@@ -10,7 +10,7 @@ where they stop.
 
 ## The claim
 
-**Given a 32-byte Ed25519 private key in the call's options, `sign/2` returns a standard
+**Given a 32-byte Ed25519 private key in the call's options (or a zero-arity function returning it), `sign/2` returns a standard
 Ed25519 signature over exactly the bytes given, reads the key from nowhere else, keeps no copy
 of it, and returns nothing that contains it.**
 
@@ -24,7 +24,7 @@ read, kept or misused beyond the host's own call.
 | The key read from a place the host did not choose (environment, file, config) | yes | one source, `opts[:private_key]`; census over source text and compiled calls |
 | The key retained after the call (process state, ETS, persistent term, app env) | yes | no state; a test compares all four before and after a call |
 | The key returned or placed in an error term | yes | returns are a signature or a fixed atom tuple; tests pin every error term |
-| The key printed in an exception when the call breaks the documented types | **yes, not yet met** | see "Open work" below |
+| The key printed in an exception or a log line | yes | a mistyped call is answered `{:error, :bad_arguments}`, never raised; the key passed by reference prints as `#Function<...>` wherever the options are printed, core's frames included (tested through core) |
 | A signature over bytes other than those given, or a non-standard signature | yes | the bytes go to `:crypto.sign/4` unaltered; tests verify with `:crypto.verify/5` and with core's `encode!/2` bytes |
 | Weak randomness | yes | none used: Ed25519 is deterministic (RFC 8032), no nonce or key is generated here |
 | The host's key storage, the node the host runs, OpenSSL defects | no | the host's and upstream's; stated in `SECURITY.md` |
@@ -50,7 +50,7 @@ read, kept or misused beyond the host's own call.
 | Separation of privilege | the key-holding code is a separate package from the keyless core; the host opts in |
 | Least privilege | no file, network, environment, OS or application-config access, held by census |
 | Least common mechanism | no shared state between calls or callers |
-| Psychological acceptability | two named error terms a host can match and act on |
+| Psychological acceptability | three named error terms a host can match and act on |
 
 ## Common implementation weaknesses countered
 
@@ -61,17 +61,26 @@ read, kept or misused beyond the host's own call.
 | CWE-338 / CWE-330 weak randomness | no randomness is used |
 | CWE-327 / CWE-326 broken algorithm, short key | Ed25519 only, 32-byte seeds only (about 128-bit security, NIST-approved in FIPS 186-5) |
 | CWE-347 improper signature verification | not applicable to signing; tests verify every signature with an independent call |
-| CWE-209 / CWE-532 key in errors or logs | met for returns; open for exceptions on misuse (below) |
+| CWE-209 / CWE-532 key in errors or logs | no result echoes input; no clause can raise on its arguments; the reference form keeps the bytes out of every printed term (see "Closed" below) |
 
-## Open work
+## Closed: the key in an exception report (found 2026-09-23)
 
-A call that breaks the documented types (bytes that are not a binary, options that are not a
-keyword list) raises `FunctionClauseError`, and Elixir formats that exception with the call's
-arguments, so the key can reach a crash log. `beam_mcp`'s `Canonical.signature/3` has the same
-shape before it reaches this package. It needs a correctly typed call to be safe today.
-Closing it is a contract decision across both packages (answer misuse with an error term that
-echoes nothing, or take the key by reference so no exception can carry its bytes) and is on
-`docs/roadmap.md`.
+Before this change, a call that broke the documented types (bytes that are not a binary,
+options that are not a keyword list) raised `FunctionClauseError`, and Elixir formats that
+exception with the call's arguments, so the key reached whatever logged it. Measured:
+`sign("bytes", %{private_key: key})` printed the 32 bytes. `beam_mcp`'s
+`Canonical.signature/3` raises the same way on mistyped options, before this package is
+reached. Two layers close it, both in this package:
+
+1. `sign/2` is total: a mistyped call is answered `{:error, :bad_arguments}`, which carries
+   nothing that was passed.
+2. `:private_key` may be a zero-arity function returning the key, and the README passes it
+   that way. A function prints as `#Function<...>`, so a key passed by reference cannot appear
+   in an exception from core, a crash report or a log line.
+
+What remains is stated: a host that passes the key as bytes and then calls core with mistyped
+options still gets the bytes in core's exception. A test pins that fact, so it fails the day
+core answers such a call instead of raising.
 
 ## How the case is kept true
 

@@ -35,12 +35,14 @@ The security requirements a host can rely on, each held by a test in `test/`:
   `opts[:private_key]` on each call and from nowhere else: no environment variable, file,
   application config, default key or store. A two-layer census holds it
   (`test/beam_mcp/signer/no_key_source_test.exs`).
-- **The key does not leave in a result.** Every return value is a signature or a fixed error
-  term; neither carries the key. **One known limit:** a call that breaks the documented types
-  (bytes that are not a binary, or options that are not a keyword list, here or at
-  `beam_mcp`'s `Canonical.signature/3`) raises a `FunctionClauseError`, and Elixir prints that
-  exception with its arguments, the key among them, wherever it is logged. Pass a keyword
-  list. Closing it for misuse too is open work, stated in `docs/assurance-case.md`.
+- **The key does not leave in a result or an exception.** Every return value is a signature or
+  a fixed error term; neither carries the key. A mistyped call is answered
+  `{:error, :bad_arguments}`, never raised, because a raised `FunctionClauseError` prints its
+  arguments. Passed by reference (`private_key: fn -> key end`, the README's form), the key
+  cannot be printed by anything: not an exception raised earlier in core's
+  `Canonical.signature/3` on a mistyped call, not a log line that inspects the options. Passed
+  as bytes, the key is as safe as every piece of code that handles the options; tests pin both
+  halves (`test/beam_mcp/signer/ed25519_test.exs`).
 - **The signature is standard Ed25519** (RFC 8032, FIPS 186-5) over exactly the canonical bytes
   `beam_mcp` produced, computed by Erlang/OTP's `:crypto` (OpenSSL), and verifiable by any
   Ed25519 implementation.

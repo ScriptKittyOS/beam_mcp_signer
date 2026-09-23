@@ -7,6 +7,24 @@ SPDX-License-Identifier: Apache-2.0
 
 ## [Unreleased]
 
+### Added
+
+- `:private_key` may be a zero-arity function returning the 32-byte key
+  (`private_key: fn -> key end`), and the README now passes it that way. Anything that prints
+  the options (an exception, a log line, a crash report) prints `#Function<...>` in place of
+  the key's bytes, including an exception raised in `beam_mcp`'s `Canonical.signature/3` on a
+  mistyped call. A function that does not return 32 bytes is `{:error, {:private_key,
+  :not_32_bytes}}`, as a key that is not 32 bytes is.
+
+### Changed
+
+- A mistyped call to `sign/2` (bytes that are not a binary, options that are not a list) is
+  answered `{:error, :bad_arguments}` instead of raising `FunctionClauseError`. Found by this
+  package's own audit: the raised error printed its arguments, the private key among them
+  (`sign("bytes", %{private_key: key})` printed all 32 bytes). **How to tell whether you are
+  affected:** only code that rescued `FunctionClauseError` from `sign/2` sees a difference;
+  a call through `Canonical.signature/3` with a keyword list never reached that clause.
+
 ### Added: the project's pages and checks (no code change)
 
 - `SECURITY.md` (private reporting, commitments, what a host can rely on, one known limit),
