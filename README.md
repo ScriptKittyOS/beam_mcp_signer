@@ -15,16 +15,24 @@ core's `BeamMCP.Signer` behaviour (`sign/2`).
 `Canonical.signature/3` hands them over; the 64-byte signature comes back beside them. Nothing
 else: no envelope byte moves, no verdict or receipt is added.
 
-**Who holds the key.** The host. It passes the 32-byte Ed25519 private key on every call:
+**Who holds the key.** The host. It passes the 32-byte Ed25519 private key on every call, as
+a zero-arity function that returns it:
 
 ```elixir
 {public_key, private_key} = :crypto.generate_key(:eddsa, :ed25519)   # or a key the host keeps
 
 {:ok, %{signature: sig}} =
-  BeamMCP.Connectome.Canonical.signature(graph, BeamMCP.Signer.Ed25519, private_key: private_key)
+  BeamMCP.Connectome.Canonical.signature(graph, BeamMCP.Signer.Ed25519,
+    private_key: fn -> private_key end)
 
 true = :crypto.verify(:eddsa, :none, BeamMCP.Connectome.Canonical.encode!(graph), sig, [public_key, :ed25519])
 ```
+
+**Why a function.** Options pass through the host's code and core's, and whatever prints
+them (an exception raised on a mistyped call, a debug log line, a crash report) prints a key
+passed as bytes, byte by byte. A function prints as `#Function<...>`. The 32 bytes themselves
+are still accepted; the function is the form that nothing printed can reveal. A mistyped call
+to this module is answered `{:error, :bad_arguments}` rather than raised, for the same reason.
 
 This package reads `opts[:private_key]` and nothing else -- no environment variable, no file,
 no application config, no default. Where the key lives between calls is the host's decision.

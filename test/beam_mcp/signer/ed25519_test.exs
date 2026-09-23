@@ -76,6 +76,67 @@ defmodule BeamMCP.Signer.Ed25519Test do
              {:error, {:private_key, :not_32_bytes}}
   end
 
+  # A FunctionClauseError is printed with the call's arguments, and the options hold the key: a
+  # raise here would put the key in the host's crash log. So a mistyped call is answered, never
+  # raised, and the answer carries no byte of what was passed.
+  test "a mistyped call is answered {:error, :bad_arguments}, never raised, and echoes nothing" do
+    {_pub, priv} = keypair()
+
+    assert Ed25519.sign("abc", %{private_key: priv}) == {:error, :bad_arguments}
+    assert Ed25519.sign(:not_bytes, private_key: priv) == {:error, :bad_arguments}
+    assert Ed25519.sign(~c"abc", private_key: priv) == {:error, :bad_arguments}
+    assert Ed25519.sign("abc", nil) == {:error, :bad_arguments}
+  end
+
+  test "the key may be passed by reference, a zero-arity function returning it, and signs as the bytes do" do
+    {pub, priv} = keypair()
+    bytes = :crypto.strong_rand_bytes(211)
+
+    assert {:ok, sig} = Ed25519.sign(bytes, private_key: fn -> priv end)
+    assert {:ok, sig} == Ed25519.sign(bytes, private_key: priv)
+    assert :crypto.verify(:eddsa, :none, bytes, sig, [pub, :ed25519])
+
+    g = graph()
+
+    assert {:ok, %{signature: through_core}} =
+             Canonical.signature(g, Ed25519, private_key: fn -> priv end)
+
+    assert :crypto.verify(:eddsa, :none, Canonical.encode!(g), through_core, [pub, :ed25519])
+  end
+
+  test "a reference that does not give 32 bytes is refused as a key that is not 32 bytes" do
+    {_pub, priv} = keypair()
+
+    for bad <- [fn -> "short" end, fn -> nil end, fn -> ~c"not a binary" end, fn _ -> priv end] do
+      assert Ed25519.sign("abc", private_key: bad) == {:error, {:private_key, :not_32_bytes}}
+    end
+  end
+
+  # What the reference buys, measured through core: `Canonical.signature/3` given a map for its
+  # options raises in core before this package is reached, and the exception prints the options.
+  # Passed by reference, the key is printed as #Function<...>; passed as bytes, the bytes are
+  # printed. The second assertion is core's to change: the day core answers a mistyped call
+  # instead of raising, it fails, and the README's advice can soften.
+  test "passed by reference, the key reaches no exception report, even from a mistyped call into core" do
+    {_pub, priv} = keypair()
+    g = graph()
+
+    report = fn opts ->
+      try do
+        Canonical.signature(g, Ed25519, opts)
+        flunk("core answered a mistyped call; the README's advice on references can be revisited")
+      rescue
+        e -> Exception.format(:error, e, __STACKTRACE__)
+      end
+    end
+
+    by_reference = report.(%{private_key: fn -> priv end})
+    refute by_reference =~ inspect(priv, limit: :infinity)
+    refute by_reference =~ priv |> :binary.bin_to_list() |> Enum.take(8) |> Enum.join(", ")
+
+    assert report.(%{private_key: priv}) =~ inspect(priv, limit: :infinity)
+  end
+
   test "reads :private_key and nothing else: other keys are neither read nor refused" do
     {pub, priv} = keypair()
 

@@ -19,6 +19,8 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
       :byte_size,
       :is_binary,
       :is_list,
+      # the guard on a key passed by reference: a zero-arity function, called in the module
+      :is_function,
       :error,
       :==,
       :"=:=",
@@ -64,10 +66,11 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
            end)
   end
 
-  test "the private key is only ever a 32-byte binary, and the seed length is a module constant" do
+  test "the private key is 32 bytes, given directly or by a zero-arity reference, and the seed length is a module constant" do
     src = File.read!(hd(@lib))
     assert src =~ "@private_key_bytes 32"
     assert src =~ "byte_size(key) == @private_key_bytes"
+    assert src =~ "is_function(key, 0), do: key.()"
     refute src =~ ~r/private_key:\s*<</, "a literal key under lib/"
   end
 
