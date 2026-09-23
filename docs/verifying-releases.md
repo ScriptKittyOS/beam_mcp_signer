@@ -19,7 +19,7 @@ and its fingerprint is:
 curl -fsSL https://github.com/HackTuah.gpg | gpg --import
 gpg --fingerprint 24FE4F05E3E8EC261462A0C782A67035D6287F15   # compare with the line above
 git clone https://github.com/ScriptKittyOS/beam_mcp_signer && cd beam_mcp_signer
-git tag -v v0.2.0                                             # "Good signature" or it did not verify
+git tag -v v0.2.1                                             # "Good signature" or it did not verify
 ```
 
 The private key is held on the maintainer's own machine, not on GitHub or hex.pm. If it is

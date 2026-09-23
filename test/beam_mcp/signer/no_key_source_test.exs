@@ -14,7 +14,6 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
   # What lib/ may call, per remote module: the beam's whole truth, held to a list.
   @allowed_calls %{
     :crypto => [sign: 4],
-    Keyword => [fetch: 2],
     :erlang => [
       :byte_size,
       :is_binary,
@@ -41,7 +40,7 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
     end
   end
 
-  test "the compiled module calls :crypto.sign/4 and Keyword.fetch/2 and nothing else outside itself" do
+  test "the compiled module calls :crypto.sign/4 and nothing else outside itself" do
     {:ok, {BeamMCP.Signer.Ed25519, [abstract_code: {:raw_abstract_v1, forms}]}} =
       :beam_lib.chunks(:code.which(BeamMCP.Signer.Ed25519), [:abstract_code])
 
@@ -70,7 +69,7 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
     src = File.read!(hd(@lib))
     assert src =~ "@private_key_bytes 32"
     assert src =~ "byte_size(key) == @private_key_bytes"
-    assert src =~ "is_function(key, 0), do: key.()"
+    assert src =~ ~r/resolve\(key\) when is_function\(key, 0\) do\n\s*key\.\(\)/
     refute src =~ ~r/private_key:\s*<</, "a literal key under lib/"
   end
 

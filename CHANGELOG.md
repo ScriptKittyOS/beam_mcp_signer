@@ -7,6 +7,39 @@ SPDX-License-Identifier: Apache-2.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-09-23
+
+A security fix: two more ways the private key could reach an exception report are closed.
+Upgrade by taking the patch; the requirement `~> 0.2.0` already admits it. Core requirement
+unchanged (`~> 0.7`).
+
+### Fixed: the key no longer reaches an exception report from two option shapes
+
+- `sign/2` read the key with `Keyword.fetch/2`, which raised with the key in view on two
+  shapes: an improper list (an `ArgumentError` from `:lists.keyfind/3`, the list in its frame)
+  and an entry `{:private_key, key, extra}` (a `CaseClauseError` carrying the entry). The
+  options are now walked by this module: an entry that is not a `{:private_key, _}` pair is
+  skipped, and an improper list whose end is reached before a `:private_key` entry is answered
+  `{:error, :bad_arguments}`. The first `{:private_key, key}` entry is read, as before. Found by
+  the project's own security review. **How to tell whether you are affected:** only a host
+  that built its options in one of those shapes, and passed the key as bytes rather than by
+  reference, could have printed it.
+
+### Fixed: a key function that raises, throws or exits is answered
+
+- A key passed by reference is read by the host's own function, and its failure could print
+  the key (a seed file read with a trailing newline and matched as 32 bytes raises a
+  `MatchError` over all 33). It is now answered `{:error, {:private_key, :unreadable}}`, a new
+  error term, and what the function raised, threw or exited with is dropped unread. **How to
+  tell whether you are affected:** a host whose key function can fail sees the new term in
+  place of its own exception, and logs inside the function if it needs the reason.
+
+### Fixed: a refusal from `:crypto` is answered, never re-raised
+
+- `:crypto.sign/4` raises when it will not sign Ed25519 (a build or FIPS provider without it,
+  or no `:crypto` loaded, whose `:undef` carries the call's arguments, the key among them). It
+  is now answered `{:error, :crypto_refused}`, a new error term; the reason is dropped unread.
+
 ### Changed: the bus factor is two (no code change)
 
 - `GOVERNANCE.md`: `znmead` knows the code (the maintainer's word, 2026-09-23) and reviews pull

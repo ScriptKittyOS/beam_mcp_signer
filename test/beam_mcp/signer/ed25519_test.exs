@@ -88,6 +88,69 @@ defmodule BeamMCP.Signer.Ed25519Test do
     assert Ed25519.sign("abc", nil) == {:error, :bad_arguments}
   end
 
+  # The options are the host's list, and a list can end in something other than []. The
+  # stdlib's Keyword.fetch/2 raises FunctionClauseError on that, printing the list -- the key
+  # in it -- so the walk is this module's own, and an improper list is answered like any other
+  # mistyped call.
+  test "options that are an improper list are answered {:error, :bad_arguments}, never raised, key first or last" do
+    {_pub, priv} = keypair()
+
+    for opts <- [
+          [{:mode, :x} | priv],
+          [{:mode, :x}, {:note, 1} | :tail],
+          [{:mode, :x} | %{private_key: priv}]
+        ] do
+      assert Ed25519.sign("abc", opts) == {:error, :bad_arguments}
+    end
+
+    # The first :private_key entry is the one read, as Keyword.fetch/2 reads it, and an entry
+    # that is not a pair is skipped; a key found before the improper tail signs.
+    assert {:ok, _} = Ed25519.sign("abc", [{:private_key, priv} | :tail])
+    assert {:ok, _} = Ed25519.sign("abc", [:flag, {:private_key, priv}, {:private_key, "x"}])
+
+    assert Ed25519.sign("abc", [{:private_key, "x"}, {:private_key, priv}]) ==
+             {:error, {:private_key, :not_32_bytes}}
+  end
+
+  # The host's own reading of the key can fail, and its report can print the key: a seed file
+  # read with a trailing newline, matched as 32 bytes, raises a MatchError over all 33. Every
+  # raise, throw and exit from the reference is answered, and nothing of it is kept.
+  test "a reference that raises, throws or exits is answered {:private_key, :unreadable}, never re-raised" do
+    {_pub, priv} = keypair()
+    file_bytes = priv <> "\n"
+
+    for bad <- [
+          fn ->
+            <<seed::binary-size(32)>> = file_bytes
+            seed
+          end,
+          fn -> throw(priv) end,
+          fn -> exit({:key, priv}) end
+        ] do
+      assert Ed25519.sign("abc", private_key: bad) == {:error, {:private_key, :unreadable}}
+    end
+  end
+
+  # 0.2.0's Keyword.fetch/2 raised a CaseClauseError carrying a longer tuple that starts with
+  # :private_key; such an entry is not the option and is skipped.
+  test "an entry {:private_key, key, extra} is not the option, and is skipped, never raised on" do
+    {_pub, priv} = keypair()
+
+    assert Ed25519.sign("abc", [{:private_key, priv, 1}]) == {:error, :no_private_key}
+    assert {:ok, _} = Ed25519.sign("abc", [{:private_key, priv, 1}, {:private_key, priv}])
+  end
+
+  # :crypto raises when OpenSSL will not sign Ed25519 (a FIPS provider without it), and the
+  # stacktrace of that error holds the call's arguments. No build this suite runs on refuses
+  # Ed25519, so the answer is pinned in the source: the one :crypto call sits under a rescue
+  # whose answer is a fixed term.
+  test "a refusal from :crypto is answered {:error, :crypto_refused}, the exception dropped" do
+    src = File.read!("lib/beam_mcp/signer/ed25519.ex")
+
+    assert src =~
+             ~r/:crypto\.sign\(.*\n\s*catch\n\s*_kind, _reason -> \{:error, :crypto_refused\}/
+  end
+
   test "the key may be passed by reference, a zero-arity function returning it, and signs as the bytes do" do
     {pub, priv} = keypair()
     bytes = :crypto.strong_rand_bytes(211)

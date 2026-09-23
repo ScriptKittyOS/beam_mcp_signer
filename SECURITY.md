@@ -37,9 +37,12 @@ The security requirements a host can rely on, each held by a test in `test/`:
   (`test/beam_mcp/signer/no_key_source_test.exs`).
 - **The key does not leave in a result or an exception.** Every return value is a signature or
   a fixed error term; neither carries the key. A mistyped call is answered
-  `{:error, :bad_arguments}`, never raised, because a raised `FunctionClauseError` prints its
-  arguments. Passed by reference (`private_key: fn -> key end`, the README's form), the key
-  cannot be printed by anything: not an exception raised earlier in core's
+  `{:error, :bad_arguments}` (options that are an improper list whose end is reached before a `:private_key` entry
+  included), a key function that raises, throws or exits is answered
+  `{:error, {:private_key, :unreadable}}`, and a refusal from `:crypto` is answered
+  `{:error, :crypto_refused}`, none raised, because a raised error can print the values it was
+  raised over. Passed by reference (`private_key: fn -> key end`, the README's form), the key
+  cannot be printed by this package or core: not an exception raised earlier in core's
   `Canonical.signature/3` on a mistyped call, not a log line that inspects the options. Passed
   as bytes, the key is as safe as every piece of code that handles the options; tests pin both
   halves (`test/beam_mcp/signer/ed25519_test.exs`).
@@ -81,5 +84,9 @@ the GitHub Advisory Database and OSV, which `mix hex.audit` reads.
 |---|---|
 | `0.2.x` | yes |
 | `0.1.x` | no, superseded (the key could reach an exception report; see the 0.2.0 CHANGELOG entry) |
+
+Within `0.2.x`, take `0.2.1` or later: `0.2.0` could print the key from options that are an
+improper list, from an entry `{:private_key, key, extra}`, or from a key function that raised
+(the 0.2.1 CHANGELOG entry).
 
 Fixes land on the latest release.

@@ -4,7 +4,7 @@
 defmodule BeamMCP.Signer.Ed25519.MixProject do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "0.2.1"
   @source_url "https://github.com/ScriptKittyOS/beam_mcp_signer"
 
   # The same floor as beam_mcp: the behaviour this package implements lives there, and one
