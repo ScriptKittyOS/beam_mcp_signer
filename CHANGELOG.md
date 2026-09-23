@@ -7,6 +7,12 @@ SPDX-License-Identifier: Apache-2.0
 
 ## [Unreleased]
 
+### Changed: governance (no code change)
+
+- `GOVERNANCE.md` names two continuity holders, as on `beam_mcp`: `znmead` (the Maintain role
+  on this repository) and Mike Hostetler (`maintainer` ownership on hex.pm; invited to
+  Maintain), what that covers and what it does not. The bus factor stays one for knowledge.
+
 ### Added
 
 - `:private_key` may be a zero-arity function returning the 32-byte key
