@@ -3,8 +3,8 @@
 #
 # The same three OTP/Elixir pairs as beam_mcp (floor, pinned, head): format, compile with
 # warnings as errors, Credo --strict (.credo.exs), the Hex audit (retired packages and OSV
-# advisories against mix.lock), the suite; and the DCO sign-off on every commit, as beam_mcp's
-# gate workflow checks it. Actions pinned by commit SHA with the version beside it.
+# advisories against mix.lock), the suite; the REUSE lint over the tree; and the DCO sign-off
+# on every commit, as beam_mcp's gate workflow checks it. Actions pinned by commit SHA with the version beside it.
 name: ci
 
 on:
@@ -41,6 +41,16 @@ jobs:
       - run: mix credo --strict
       - run: mix hex.audit
       - run: mix test
+
+
+  reuse:
+    name: REUSE lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: every file carries copyright and licence information (the version beam_mcp pins)
+        run: pipx run reuse==6.2.0 lint
 
   dco:
     name: DCO sign-off

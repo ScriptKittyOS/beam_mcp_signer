@@ -33,7 +33,8 @@ defmodule BeamMCP.Signer.Ed25519.MixProject do
           "docs/architecture.md",
           "docs/assurance-case.md",
           "docs/roadmap.md",
-          "docs/verifying-releases.md"
+          "docs/verifying-releases.md",
+          "docs/security-review.md"
         ]
       ],
       aliases: [check_otp: &check_otp!/1]

@@ -39,6 +39,28 @@ Erlang/OTP 27 or newer and Elixir 1.17 or newer, the same floor as `beam_mcp`. C
    (`test/beam_mcp/signer/no_key_source_test.exs`) red when the rule is broken: plant the
    break, show it red, restore it.
 
+## Code review
+
+**How it is done.** Every change reaches `main` through a pull request, the maintainer's
+included, rebased after CI is green on all three OTP/Elixir pairs. The reviewer reads the diff,
+the commit messages and the CI results, and runs the suite locally for any change under `lib/`.
+
+**What must be checked.**
+- The change does what its message says, and nothing else.
+- New or changed behaviour has tests; a fix has a test that was seen failing first.
+- **The key:** it is read from `opts[:private_key]` and nowhere else; no result, error term or
+  raise carries it; nothing is kept after the call. The key-source census
+  (`test/beam_mcp/signer/no_key_source_test.exs`) still passes for the right reason, and a
+  change to how the key is handled is shown red against a planted break.
+- `SECURITY.md`, `docs/assurance-case.md` and the README change with the behaviour they describe.
+- Sign-off on every commit, no attribution trailers, no key or secret in the diff.
+
+**What is acceptable.** All of the above hold, CI is green, and the reviewer can say why the
+change is correct; otherwise it is sent back with the reason. **Who reviews:** the maintainer
+reviews every pull request; the continuity holders in `GOVERNANCE.md` may review as well. A
+review by a person other than the author on at least half of all changes is the project's aim;
+the pull requests show who reviewed each one.
+
 ## Coding style
 
 The Elixir community's: the output of `mix format` (this repository's `.formatter.exs`) and
