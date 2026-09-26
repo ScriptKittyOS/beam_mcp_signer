@@ -39,3 +39,20 @@ The script builds from `git archive` of the tag (tracked files only, every file 
 two machines produce the same bytes. A release published with the script (`--publish`) has
 the checksum hex.pm shows; `0.1.0` and `0.1.1` were built from a working tree before the
 script existed, and are verified by their signed tags only.
+
+## Build provenance
+
+From `0.2.1` each release's tarball carries a SLSA build-provenance attestation, made by
+`.github/workflows/provenance.yml`: CI builds the tarball from the tag with the same script,
+attests its digest (Sigstore-signed, in GitHub's attestation store), and checks that the
+bytes hex.pm serves are the bytes it attested. `0.2.1` was attested after its release, by a
+manual run of the workflow on its tag; later releases are attested by the tag's own run.
+
+```sh
+v=0.2.1
+curl -fsSLO "https://repo.hex.pm/tarballs/beam_mcp_signer-${v}.tar"
+gh attestation verify "beam_mcp_signer-${v}.tar" --repo ScriptKittyOS/beam_mcp_signer \
+  --signer-workflow ScriptKittyOS/beam_mcp_signer/.github/workflows/provenance.yml
+```
+
+`gh attestation` needs GitHub CLI 2.49 or newer.
