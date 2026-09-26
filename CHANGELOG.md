@@ -7,6 +7,18 @@ SPDX-License-Identifier: Apache-2.0
 
 ## [Unreleased]
 
+### Added: build provenance for each release
+
+- `.github/workflows/provenance.yml`: on a release tag, CI builds the tarball with
+  `tools/release_tarball.sh`, attests its digest (SLSA build provenance), and verifies the
+  attestation against what hex.pm serves. A manual run takes a published tag, so `0.2.1` is
+  attested after its release. `docs/verifying-releases.md` gives the command.
+
+### Changed: `main` is protected by a ruleset (no code change)
+
+- `GOVERNANCE.md`: how a change lands is now enforced on `main` (pull requests only, rebase
+  merges, linear history, the five checks required, no bypass), where it had been practice.
+
 ## [0.2.1] - 2026-09-26
 
 A security fix: two more ways the private key could reach an exception report are closed.
