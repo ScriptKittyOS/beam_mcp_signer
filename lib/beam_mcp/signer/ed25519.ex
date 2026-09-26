@@ -46,9 +46,10 @@ defmodule BeamMCP.Signer.Ed25519 do
   Returns `{:ok, signature}` (64 bytes); `{:error, :no_private_key}` when the option is
   absent; `{:error, {:private_key, :not_32_bytes}}` when it is present and is not 32 bytes,
   or is a function that does not return 32 bytes; `{:error, {:private_key, :unreadable}}` when
-  it is a function that raises, throws or exits; and `{:error, :bad_arguments}` when
-  `canonical_bytes` is not a binary or `opts` is not a list, or is an improper list whose end
-  is reached before a `:private_key` entry. Those are answers, not raises, on purpose: an
+  it is a function that raises, throws or exits (an `exit/1` the function means on purpose
+  included); and `{:error, :bad_arguments}` when `canonical_bytes` is not a binary or `opts`
+  is not a list, or is an improper list whose end is reached before a `:private_key` entry (a
+  `:private_key` entry found before an improper tail is read, and signs, as it did before). Those are answers, not raises, on purpose: an
   exception is printed with the values it was raised over, and the options, or the host's own
   reading of the key, hold the key. For the same reason a refusal from `:crypto` itself (an
   OpenSSL build or FIPS provider that does not offer Ed25519, or no `:crypto` loaded at all) is
@@ -66,10 +67,13 @@ defmodule BeamMCP.Signer.Ed25519 do
              | :bad_arguments
              | :crypto_refused}
   def sign(canonical_bytes, opts) when is_binary(canonical_bytes) and is_list(opts) do
-    case fetch_key(opts) do
-      {:ok, key} -> sign_with(canonical_bytes, resolve(key))
+    with {:ok, key} <- fetch_key(opts),
+         {:ok, bytes} <- resolve(key) do
+      sign_with(canonical_bytes, bytes)
+    else
       :error -> {:error, :no_private_key}
       :bad -> {:error, :bad_arguments}
+      :unreadable -> {:error, {:private_key, :unreadable}}
     end
   end
 
@@ -88,21 +92,19 @@ defmodule BeamMCP.Signer.Ed25519 do
   # A reference is called here and nowhere else, once per signature; its result is not kept.
   # What it raises, throws or exits is the host's code reading the key, and its report can
   # print the key (a MatchError on a seed file with a trailing newline prints the bytes): it
-  # is answered as unreadable, the reason dropped unread.
+  # is answered as unreadable, the reason dropped unread. The answer is tagged, so no value the
+  # function returns can be mistaken for the failure.
   defp resolve(key) when is_function(key, 0) do
-    key.()
+    {:ok, key.()}
   catch
-    _kind, _reason -> {__MODULE__, :unreadable}
+    _kind, _reason -> :unreadable
   end
 
-  defp resolve(key), do: key
+  defp resolve(key), do: {:ok, key}
 
   # `:crypto` raises when OpenSSL will not sign (a build or FIPS provider without Ed25519, or
   # no `:crypto` loaded, which is `:undef` with the call's arguments, the key among them, in
   # its frame), and such a report may carry the key: answered here, the reason dropped unread.
-  defp sign_with(_canonical_bytes, {__MODULE__, :unreadable}),
-    do: {:error, {:private_key, :unreadable}}
-
   defp sign_with(canonical_bytes, key)
        when is_binary(key) and byte_size(key) == @private_key_bytes do
     {:ok, :crypto.sign(:eddsa, :none, canonical_bytes, [key, :ed25519])}

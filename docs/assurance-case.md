@@ -24,7 +24,7 @@ read, kept or misused beyond the host's own call.
 | The key read from a place the host did not choose (environment, file, config) | yes | one source, `opts[:private_key]`; census over source text and compiled calls |
 | The key retained after the call (process state, ETS, persistent term, app env) | yes | no state; a test compares all four before and after a call |
 | The key returned or placed in an error term | yes | returns are a signature or a fixed atom tuple; tests pin every error term |
-| The key printed in an exception or a log line | yes | a mistyped call, options that are an improper list whose end is reached before a `:private_key` entry among them, is answered `{:error, :bad_arguments}`, a key function that raises, throws or exits `{:error, {:private_key, :unreadable}}`, and a refusal from `:crypto` `{:error, :crypto_refused}`, none raised; the key passed by reference prints as `#Function<...>` wherever the options are printed, core's frames included (tested through core) |
+| The key printed in an exception or a log line | yes | nothing `sign/2` meets is raised: a mistyped call is answered `{:error, :bad_arguments}` (so is an improper list whose end comes before a `:private_key` entry), a failing key function `{:error, {:private_key, :unreadable}}`, a refusal from `:crypto` `{:error, :crypto_refused}`; the key passed by reference prints as `#Function<...>` wherever the options are printed, core's frames included (tested through core) |
 | A signature over bytes other than those given, or a non-standard signature | yes | the bytes go to `:crypto.sign/4` unaltered; tests verify with `:crypto.verify/5` and with core's `encode!/2` bytes |
 | Weak randomness | yes | none used: Ed25519 is deterministic (RFC 8032), no nonce or key is generated here |
 | The host's key storage, the node the host runs, OpenSSL defects | no | the host's and upstream's; stated in `SECURITY.md` |
@@ -72,10 +72,10 @@ exception with the call's arguments, so the key reached whatever logged it. Meas
 `Canonical.signature/3` raises the same way on mistyped options, before this package is
 reached. Two layers close it, both in this package:
 
-1. `sign/2` is total: a mistyped call (options that are an improper list whose end is reached before a `:private_key` entry
-   among them) is answered `{:error, :bad_arguments}`, a key function that raises, throws or
-   exits `{:error, {:private_key, :unreadable}}`, and a refusal from `:crypto`
-   `{:error, :crypto_refused}`; none carries anything that was passed.
+1. `sign/2` is total. A mistyped call is answered `{:error, :bad_arguments}` (so is an
+   improper list whose end comes before a `:private_key` entry), a key function that raises,
+   throws or exits is answered `{:error, {:private_key, :unreadable}}`, and a refusal from
+   `:crypto` is answered `{:error, :crypto_refused}`. None carries anything that was passed.
 2. `:private_key` may be a zero-arity function returning the key, and the README passes it
    that way. A function prints as `#Function<...>`, so a key passed by reference cannot appear
    in an exception from core, a crash report or a log line.

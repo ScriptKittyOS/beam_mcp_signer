@@ -30,12 +30,12 @@ One module, one function, one dependency direction.
   `BeamMCP.Signer` behaviour. `sign/2` takes the canonical bytes and the host's options, reads
   the private key from `opts[:private_key]` (the 32 bytes, or a zero-arity function returning
   them, which is called once), checks it is a 32-byte binary, and returns `{:ok, signature}`,
-  `{:error, :no_private_key}` or `{:error, {:private_key, :not_32_bytes}}`. A mistyped call,
-  options that are an improper list whose end is reached before a `:private_key` entry among them, is
-  answered `{:error, :bad_arguments}`, a key function that raises, throws or exits
-  `{:error, {:private_key, :unreadable}}`, and a refusal from `:crypto`
-  `{:error, :crypto_refused}`; none is raised, so no
-  exception prints the options.
+  `{:error, :no_private_key}` or `{:error, {:private_key, :not_32_bytes}}`. Nothing it meets
+  is raised, so no exception prints the options: a mistyped call is answered
+  `{:error, :bad_arguments}` (so is an improper list whose end comes before a `:private_key`
+  entry), a key function that raises, throws or exits is answered
+  `{:error, {:private_key, :unreadable}}`, and a refusal from `:crypto` is answered
+  `{:error, :crypto_refused}`.
 - **`beam_mcp`** (a dependency, `~> 0.7`): defines the behaviour and produces the bytes. It
   holds no key, calls no signing primitive and does not depend on this package.
 - **Erlang/OTP `:crypto`**: performs Ed25519. This package implements no cryptography itself.

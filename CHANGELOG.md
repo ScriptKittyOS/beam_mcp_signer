@@ -20,7 +20,9 @@ unchanged (`~> 0.7`).
   and an entry `{:private_key, key, extra}` (a `CaseClauseError` carrying the entry). The
   options are now walked by this module: an entry that is not a `{:private_key, _}` pair is
   skipped, and an improper list whose end is reached before a `:private_key` entry is answered
-  `{:error, :bad_arguments}`. The first `{:private_key, key}` entry is read, as before. Found by
+  `{:error, :bad_arguments}`. The first `{:private_key, key}` entry is read, as before, so a
+  key found before an improper tail still signs (0.2.0's `:lists.keyfind/3` also returned
+  before reaching the tail). Found by
   the project's own security review. **How to tell whether you are affected:** only a host
   that built its options in one of those shapes, and passed the key as bytes rather than by
   reference, could have printed it.
@@ -30,7 +32,8 @@ unchanged (`~> 0.7`).
 - A key passed by reference is read by the host's own function, and its failure could print
   the key (a seed file read with a trailing newline and matched as 32 bytes raises a
   `MatchError` over all 33). It is now answered `{:error, {:private_key, :unreadable}}`, a new
-  error term, and what the function raised, threw or exited with is dropped unread. **How to
+  error term, and what the function raised, threw or exited with is dropped unread, an
+  `exit/1` the function means on purpose included. **How to
   tell whether you are affected:** a host whose key function can fail sees the new term in
   place of its own exception, and logs inside the function if it needs the reason.
 

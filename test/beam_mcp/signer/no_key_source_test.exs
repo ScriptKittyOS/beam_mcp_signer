@@ -69,7 +69,7 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
     src = File.read!(hd(@lib))
     assert src =~ "@private_key_bytes 32"
     assert src =~ "byte_size(key) == @private_key_bytes"
-    assert src =~ ~r/resolve\(key\) when is_function\(key, 0\) do\n\s*key\.\(\)/
+    assert src =~ ~r/resolve\(key\) when is_function\(key, 0\) do\s+\{:ok, key\.\(\)\}/
     refute src =~ ~r/private_key:\s*<</, "a literal key under lib/"
   end
 

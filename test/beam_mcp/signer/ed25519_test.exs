@@ -89,9 +89,10 @@ defmodule BeamMCP.Signer.Ed25519Test do
   end
 
   # The options are the host's list, and a list can end in something other than []. The
-  # stdlib's Keyword.fetch/2 raises FunctionClauseError on that, printing the list -- the key
-  # in it -- so the walk is this module's own, and an improper list is answered like any other
-  # mistyped call.
+  # stdlib's Keyword.fetch/2 raises on that (an ArgumentError: `:lists.keyfind/3` is badarg on
+  # an improper list), with the list -- the key in it -- in the frame, so the walk is this
+  # module's own, and an improper list is answered like any other mistyped call. A key found
+  # before the improper tail is read and signs, as it did before.
   test "options that are an improper list are answered {:error, :bad_arguments}, never raised, key first or last" do
     {_pub, priv} = keypair()
 
@@ -142,13 +143,29 @@ defmodule BeamMCP.Signer.Ed25519Test do
 
   # :crypto raises when OpenSSL will not sign Ed25519 (a FIPS provider without it), and the
   # stacktrace of that error holds the call's arguments. No build this suite runs on refuses
-  # Ed25519, so the answer is pinned in the source: the one :crypto call sits under a rescue
-  # whose answer is a fixed term.
+  # Ed25519, so the answer is pinned in the source: the one :crypto call sits in a function
+  # whose `catch` of every kind answers a fixed term. The pattern reads the source text, so it
+  # allows any layout between the call and the catch (a `mix format` reflow does not break it);
+  # the mutant that removes the catch is what this test is for.
   test "a refusal from :crypto is answered {:error, :crypto_refused}, the exception dropped" do
     src = File.read!("lib/beam_mcp/signer/ed25519.ex")
 
     assert src =~
-             ~r/:crypto\.sign\(.*\n\s*catch\n\s*_kind, _reason -> \{:error, :crypto_refused\}/
+             ~r/:crypto\.sign\([^\n]*\)\}?\s+catch\s+_kind,\s*_reason\s*->\s*\{:error, :crypto_refused\}/
+  end
+
+  # The failure of a key function is a tagged answer, never a value: whatever the function
+  # returns is only a key that is or is not 32 bytes, however it is shaped.
+  test "no value a key function returns, or a key passed directly, is mistaken for its failure" do
+    lookalike = {Ed25519, :unreadable}
+
+    assert Ed25519.sign("abc", private_key: fn -> lookalike end) ==
+             {:error, {:private_key, :not_32_bytes}}
+
+    assert Ed25519.sign("abc", private_key: lookalike) == {:error, {:private_key, :not_32_bytes}}
+
+    assert Ed25519.sign("abc", private_key: :unreadable) ==
+             {:error, {:private_key, :not_32_bytes}}
   end
 
   test "the key may be passed by reference, a zero-arity function returning it, and signs as the bytes do" do

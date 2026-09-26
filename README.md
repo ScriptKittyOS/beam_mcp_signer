@@ -31,12 +31,13 @@ true = :crypto.verify(:eddsa, :none, BeamMCP.Connectome.Canonical.encode!(graph)
 **Why a function.** Options pass through the host's code and core's, and whatever prints
 them (an exception raised on a mistyped call, a debug log line, a crash report) prints a key
 passed as bytes, byte by byte. A function prints as `#Function<...>`. The 32 bytes themselves
-are still accepted; the function is the form that nothing printed can reveal. A mistyped call
-to this module (including options that are an improper list whose end is reached before a `:private_key` entry) is
-answered `{:error, :bad_arguments}` rather than raised, a key function that raises, throws or
-exits is answered `{:error, {:private_key, :unreadable}}`, and a refusal from `:crypto` is
-answered `{:error, :crypto_refused}`, for the same reason. The key function's own exception is
-dropped with it, so a host that wants it logged logs it inside that function, without the key.
+are still accepted; the function is the form that nothing printed can reveal. For the same
+reason nothing this module meets is raised: a mistyped call is answered
+`{:error, :bad_arguments}` (so is an improper list whose end comes before a `:private_key`
+entry), a key function that raises, throws or exits is answered
+`{:error, {:private_key, :unreadable}}`, and a refusal from `:crypto` is answered
+`{:error, :crypto_refused}`. The key function's own exception is dropped with it, so a host
+that wants it logged logs it inside that function, without the key.
 
 This package reads `opts[:private_key]` and nothing else -- no environment variable, no file,
 no application config, no default. Where the key lives between calls is the host's decision.
