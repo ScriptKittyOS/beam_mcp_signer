@@ -7,7 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 
 ## [Unreleased]
 
-## [0.2.1] - 2026-09-23
+## [0.2.1] - 2026-09-26
 
 A security fix: two more ways the private key could reach an exception report are closed.
 Upgrade by taking the patch; the requirement `~> 0.2.0` already admits it. Core requirement
