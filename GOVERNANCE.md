@@ -20,8 +20,9 @@ apply here, and this page says what is particular to this repository.
 | **Contributor** | anyone | proposes changes by pull request under `CONTRIBUTING.md`: signed off, tested, green; reports bugs and enhancements as issues; reports vulnerabilities privately |
 
 There is no steering group and no vote. A decision is the maintainer's and is recorded in the
-tree (a CHANGELOG entry, a page, a test) or it was not made. Access is held twice; knowledge
-is held once, so the bus factor is one, stated rather than hidden.
+tree (a CHANGELOG entry, a page, a test) or it was not made. The knowledge is held twice:
+`znmead` knows the code (the maintainer's word, 2026-09-23) and reviews pull requests from that
+date, so the bus factor is two, and his reviews are the public record of it.
 
 ## How a change lands
 

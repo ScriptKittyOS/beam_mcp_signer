@@ -7,6 +7,11 @@ SPDX-License-Identifier: Apache-2.0
 
 ## [Unreleased]
 
+### Changed: the bus factor is two (no code change)
+
+- `GOVERNANCE.md`: `znmead` knows the code (the maintainer's word, 2026-09-23) and reviews pull
+  requests from that date, so the bus factor is two.
+
 ## [0.2.0] - 2026-09-23
 
 A security fix and an addition, placed at the minor (0.x): the private key no longer reaches an
