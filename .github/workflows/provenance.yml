@@ -1,0 +1,116 @@
+# SPDX-FileCopyrightText: 2026 Sudo Apt Holdings LLC
+# SPDX-License-Identifier: Apache-2.0
+#
+# Build provenance for the Hex tarball, as beam_mcp's provenance workflow does it: CI builds
+# the tarball the canonical way (tools/release_tarball.sh: `git archive` at the ref, every
+# file 644), attests its digest (SLSA build provenance, Sigstore-signed, GitHub's attestation
+# store), and verifies the attestation against the tarball it built and against the bytes
+# hex.pm serves for that version. The tarball's sha256 is hex.pm's package checksum, so a
+# match binds the attestation to the published package.
+#
+# THE OWNER TAGS AND PUBLISHES; THIS WORKFLOW ATTESTS. It never runs `mix hex.publish`. Order:
+# publish, then push the tag; on the tag's run a version hex.pm does not serve, or serves as
+# other bytes, is a failure.
+#
+# A manual run takes `ref`, a tag already published (for example v0.2.1, released before this
+# workflow existed): it builds that tag's tree with this workflow and holds the result to
+# hex.pm's bytes the same way, so a failure to fetch or match fails the run. With no `ref`,
+# a manual run attests the branch head, which is nobody's release, and its hex.pm half reads
+# NOT MEASURED.
+
+name: provenance
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "A published release tag to attest (e.g. v0.2.1); empty attests the branch head"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  attest:
+    name: Provenance - build, attest, verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # The pinned pair, a copy of .tool-versions' line.
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          otp-version: "28"
+          elixir-version: "1.18"
+      - name: the tarball, built the canonical way, its version and its sha256 (hex.pm's package checksum)
+        id: build
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+          ref="${INPUT_REF:-${GITHUB_SHA}}"
+          case "$ref" in
+            "${GITHUB_SHA}") claimed="${{ github.ref_type == 'tag' }}" ;;
+            v*) git rev-parse --verify --quiet "refs/tags/${ref}" >/dev/null || { echo "no tag ${ref}"; exit 1; }; claimed=true ;;
+            *) echo "ref must be a release tag (v...) or empty"; exit 1 ;;
+          esac
+          version=$(git show "${ref}:mix.exs" | sed -nE 's/^  @version "([^"]+)"$/\1/p' | head -1)
+          [ -n "$version" ] || { echo "no @version in ${ref}'s mix.exs"; exit 1; }
+          tools/release_tarball.sh "${ref}" "beam_mcp_signer-${version}.tar" | tee build.out
+          sha=$(sha256sum "beam_mcp_signer-${version}.tar" | cut -d' ' -f1)
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "sha256=${sha}" >> "$GITHUB_OUTPUT"
+          echo "claimed=${claimed}" >> "$GITHUB_OUTPUT"
+          echo "tarball beam_mcp_signer-${version}.tar from ${ref}: sha256 ${sha}"
+      # Pinned by commit (v4.2.2), as in beam_mcp.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: beam_mcp_signer-${{ steps.build.outputs.version }}.tar
+      - name: verify the attestation against the tarball this run built
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh attestation verify "beam_mcp_signer-${{ steps.build.outputs.version }}.tar" --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/provenance.yml"
+      - name: verify the attestation against the bytes hex.pm serves for this version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLAIMED: ${{ steps.build.outputs.claimed }}
+        run: |
+          set -uo pipefail
+          v="${{ steps.build.outputs.version }}"
+          code=$(curl -sSL -o "published-${v}.tar" -w '%{http_code}' "https://repo.hex.pm/tarballs/beam_mcp_signer-${v}.tar") || code="000"
+          if [ "${code}" != "200" ]; then
+            if [ "${CLAIMED}" = "true" ]; then
+              echo "FAIL: hex.pm answered ${code} for beam_mcp_signer ${v} -- publish first, then push the tag (404: not published; anything else: the fetch failed)"
+              exit 1
+            fi
+            echo "NOT MEASURED: hex.pm answered ${code} for beam_mcp_signer ${v}; a run on a branch head attests nobody's release"
+            exit 0
+          fi
+          pub=$(sha256sum "published-${v}.tar" | cut -d' ' -f1)
+          echo "published sha256 ${pub}; built ${{ steps.build.outputs.sha256 }}"
+          if [ "${pub}" != "${{ steps.build.outputs.sha256 }}" ]; then
+            if [ "${CLAIMED}" = "true" ]; then
+              echo "FAIL: the published tarball is not the bytes this tag builds canonically; it was not published with tools/release_tarball.sh"
+              exit 1
+            fi
+            echo "NOT MEASURED: hex.pm serves ${v} but not this commit's bytes; a run on a branch head attests nobody's release"
+            exit 0
+          fi
+          gh attestation verify "published-${v}.tar" --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/provenance.yml"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tarball-${{ steps.build.outputs.version }}
+          path: beam_mcp_signer-${{ steps.build.outputs.version }}.tar
+          if-no-files-found: error
