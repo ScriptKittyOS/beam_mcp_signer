@@ -67,9 +67,15 @@ authorizes.
 
 ## CVEs
 
-Advisories are published from this repository's GitHub Security Advisories. GitHub is a CVE
-Numbering Authority for the repositories it hosts, so a CVE is requested from the advisory
-draft when the defect warrants one; Critical and High always do. Published advisories reach
+Advisories are published from this repository's GitHub Security Advisories. CVE IDs come from
+the [Erlang Ecosystem Foundation's CNA](https://cna.erlef.org/), the CVE Numbering Authority for
+every active package on hex.pm (GitHub is a CNA too, and does not assign for a package another CNA
+covers). An advisory that warrants one gets one before publication; Critical and High always do.
+The EEF CNA's points of contact (@IngelaAndin, @maennchen, @voltone) are added to the draft
+advisory as collaborators, the CVE is left as "request later", and the ID they assign is entered
+as an existing CVE ([their maintainer process](https://cna.erlef.org/maintainer-process)).
+`0.2.1`'s advisory was first requested from GitHub, which cannot assign it, and was then
+requested from the EEF CNA. Published advisories reach
 the GitHub Advisory Database and OSV, which `mix hex.audit` reads.
 
 ## Out of scope
