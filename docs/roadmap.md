@@ -14,7 +14,7 @@ are not promised; the order is.
    reaches no exception report; a mistyped call is answered, not raised.
 2. **Follow `beam_mcp` to `1.0.0`.** The requirement is `~> 0.7` today; when core ships
    `1.0.0`, this package releases with a `~> 1.0` requirement, and then takes its own `1.0.0`
-   once its surface (one function, four results) has stood a release unchanged.
+   once its surface (one function, six results) has stood a release unchanged.
 3. **Release tooling as core has it**: the canonical tarball script (in the tree) used for
    every publish, and a build-provenance attestation on each release tag.
 4. **Keep current**: security fixes on `SECURITY.md`'s commitments, dependency updates through
