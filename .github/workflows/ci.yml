@@ -1,10 +1,18 @@
 # SPDX-FileCopyrightText: 2026 Sudo Apt Holdings LLC
 # SPDX-License-Identifier: Apache-2.0
 #
-# The same three OTP/Elixir pairs as beam_mcp (floor, pinned, head): format, compile with
-# warnings as errors, Credo --strict (.credo.exs), the Hex audit (retired packages and OSV
-# advisories against mix.lock), the suite; the REUSE lint over the tree; and the DCO sign-off
-# on every commit, as beam_mcp's gate workflow checks it. Actions pinned by commit SHA with the version beside it.
+# The same four OTP/Elixir legs as beam_mcp (floor, pinned, head, box): the OTP floor
+# (tools/otp_floor.sh), format, compile with warnings as errors, Credo --strict (.credo.exs),
+# the Hex audit (retired packages and OSV advisories against mix.lock), the suite; the REUSE
+# lint over the tree; and the DCO sign-off on every commit, as beam_mcp's gate workflow checks
+# it. Actions pinned by commit SHA with the version beside it.
+#
+# THE BOX LEG: the pair a fielded edge box runs (OTP 28 at a patched release, Elixir 1.20) on
+# the architecture it runs on (aarch64, GitHub's arm64 runner, free for public repositories).
+# Its versions are exact (`version-type: strict`), not "the newest 28": the box pins its
+# runtime, so the leg does too. Every leg runs the OTP floor step, so a resolution below a
+# line's patched floor (tools/otp-floors, CVE-2026-55737) is a red leg, not a green one on a
+# vulnerable runtime.
 name: ci
 
 on:
@@ -18,15 +26,16 @@ permissions:
 jobs:
   test:
     name: test (OTP ${{ matrix.otp }}, Elixir ${{ matrix.elixir }}, ${{ matrix.leg }})
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { leg: floor,  otp: "27", elixir: "1.17" }
-          - { leg: pinned, otp: "28", elixir: "1.18" }
-          - { leg: head,   otp: "29", elixir: "1.20" }
+          - { leg: floor,  otp: "27", elixir: "1.17", os: ubuntu-24.04, version-type: loose }
+          - { leg: pinned, otp: "28", elixir: "1.18", os: ubuntu-24.04, version-type: loose }
+          - { leg: head,   otp: "29", elixir: "1.20", os: ubuntu-24.04, version-type: loose }
+          - { leg: box,    otp: "28.5.0.8", elixir: "1.20.4", os: ubuntu-24.04-arm, version-type: strict }
     env:
       MIX_ENV: test
     steps:
@@ -35,6 +44,15 @@ jobs:
         with:
           otp-version: ${{ matrix.otp }}
           elixir-version: ${{ matrix.elixir }}
+          version-type: ${{ matrix.version-type }}
+      # Also printed, not asserted: the OpenSSL `:crypto` is linked to and whether it offers
+      # ML-DSA-87, which an ML-DSA signer needs from the leg it runs on.
+      - name: the pair setup-beam installed, at or above its line's patched OTP floor
+        run: |
+          erl -noshell -eval 'io:format("~s~n", [erlang:system_info(system_version)]), halt().'
+          elixir --version | tail -1
+          erl -noshell -eval '[{_, _, L}] = crypto:info_lib(), K = proplists:get_value(public_keys, crypto:supports()), io:format("crypto linked to ~s; mldsa87 offered: ~p~n", [L, lists:member(mldsa87, K)]), halt().'
+          bash tools/otp_floor.sh
       - run: mix deps.get
       - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors

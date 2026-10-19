@@ -86,5 +86,5 @@ core answers such a call instead of raising.
 
 ## How the case is kept true
 
-CI runs the suite, the census and Credo on every push on three OTP/Elixir pairs; a change to how
+CI runs the suite, the census and Credo on every push on four OTP/Elixir legs; a change to how
 the key is read or returned changes this page in the same pull request (`GOVERNANCE.md`).
