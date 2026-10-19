@@ -21,7 +21,8 @@ mix test
 
 Erlang/OTP 27 or newer and Elixir 1.17 or newer, the same floor as `beam_mcp`. CI runs
 `mix format --check-formatted`, `mix compile --warnings-as-errors`, `mix credo --strict`,
-`mix hex.audit` and `mix test` on three OTP/Elixir pairs; run the same before you push.
+`mix hex.audit` and `mix test` on four OTP/Elixir legs, after checking the runtime is at or above
+its line's patched OTP floor (`tools/otp_floor.sh`); run the same before you push.
 
 ## The rules, all enforced
 
@@ -42,7 +43,7 @@ Erlang/OTP 27 or newer and Elixir 1.17 or newer, the same floor as `beam_mcp`. C
 ## Code review
 
 **How it is done.** Every change reaches `main` through a pull request, the maintainer's
-included, rebased after CI is green on all three OTP/Elixir pairs. The reviewer reads the diff,
+included, rebased after CI is green on all four OTP/Elixir legs. The reviewer reads the diff,
 the commit messages and the CI results, and runs the suite locally for any change under `lib/`.
 
 **What must be checked.**
