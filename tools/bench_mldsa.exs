@@ -38,9 +38,12 @@ cpu =
   case File.read("/proc/cpuinfo") do
     {:ok, info} ->
       fields = for line <- String.split(info, "\n"), [k, v] <- [String.split(line, ":", parts: 2)], do: {String.trim(k), String.trim(v)}
-      model = Enum.find_value(fields, "unknown", fn {k, v} -> k in ["model name", "Model"] and v end)
-      part = Enum.find_value(fields, nil, fn {k, v} -> k == "CPU part" and v end)
-      "#{model}#{if part, do: " (CPU part #{part})", else: ""}, #{System.schedulers_online()} schedulers"
+      get = fn key -> Enum.find_value(fields, fn {k, v} -> k == key and v end) end
+      # x86_64 names its model; arm64 Linux gives only the implementer and part numbers (on
+      # GitHub's arm64 runner, 0x41 and 0xd49: Arm, Neoverse N2), so those are what is printed.
+      model = get.("model name") || get.("Model") || "CPU implementer #{get.("CPU implementer") || "?"}"
+      part = get.("CPU part")
+      "#{model}#{if part, do: ", CPU part #{part}", else: ""}; #{System.schedulers_online()} schedulers"
 
     _ ->
       "unknown"
@@ -50,7 +53,13 @@ cpu =
 IO.puts("machine: #{cpu}; #{:erlang.system_info(:system_architecture)}")
 IO.puts("runtime: OTP #{:erlang.system_info(:otp_release)}, #{openssl}; #{rounds} rounds per size")
 
-percentile = fn sorted, p -> Enum.at(sorted, min(length(sorted) - 1, trunc(p * length(sorted)))) end
+# The p-th percentile is the sample at index trunc(p * rounds), printed only when some sample lies
+# above it: at 1,000 rounds or fewer the p99.9 index is the last sample, which is max, not p99.9,
+# so it prints "-".
+percentile = fn sorted, p ->
+  i = trunc(p * length(sorted))
+  if i < length(sorted) - 1, do: Enum.at(sorted, i), else: "-"
+end
 
 measure = fn f ->
   for _ <- 1..rounds do
