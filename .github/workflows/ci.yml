@@ -69,9 +69,10 @@ jobs:
         if: matrix.leg == 'box'
         run: mix run tools/mldsa_sample.exs mldsa87-sample
       # Recorded, not asserted: a shared runner's latency is the runner's, never a box's figure.
+      # 2,000 rounds per size, so the printed p99.9 is a percentile and not the maximum.
       - name: ML-DSA-87 latency on this runner (recorded, no threshold)
         if: matrix.leg == 'box'
-        run: mix run tools/bench_mldsa.exs 500
+        run: mix run tools/bench_mldsa.exs 2000
       - if: matrix.leg == 'box'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
