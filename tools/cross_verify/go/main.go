@@ -62,4 +62,6 @@ func main() {
 		fail("the public key is not the one the seed derives")
 	}
 	fmt.Println("ok   the public key is the one the seed derives")
+
+	verifyCarrier(pk, encoded, message, read(dir, "carrier.cbor"))
 }

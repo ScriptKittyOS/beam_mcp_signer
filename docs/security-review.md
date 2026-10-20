@@ -21,9 +21,9 @@ boundaries in `docs/assurance-case.md`.
 
 Each item is answered with what was read, what was tried, and what was found.
 
-1. **One source for the key.** Read `lib/beam_mcp/signer/ed25519.ex` and
-   `lib/beam_mcp/signer/mldsa87.ex` in full. Is each key read from its option only
-   (`:private_key`, and `:public_key` for ML-DSA-87)? Does the census's regex and call list still describe the
+1. **One source for the key.** Read `lib/beam_mcp/signer/ed25519.ex`,
+   `lib/beam_mcp/signer/mldsa87.ex` and `lib/beam_mcp/signer/cose.ex` in full. Is each key read
+   from its option only (`:private_key`, and `:public_key` for ML-DSA-87 and COSE)? Does the census's regex and call list still describe the
    compiled module (`test/beam_mcp/signer/no_key_source_test.exs`)?
 2. **Nothing kept.** No process state, table, persistent term, application environment or
    file after a call; a reference (`fn -> key end`) called once and dropped.
@@ -35,6 +35,10 @@ Each item is answered with what was read, what was tried, and what was found.
    type `:none` and no options argument, so no prehash and no context. For ML-DSA-87: does the
    check before return refuse a seed with the wrong public key, and does the suite's vector
    count still match the fixtures?
+   For COSE: is the protected header exactly `{1: -50, 4: kid, 16: typ}` with `kid` computed
+   from the public key, and does ToBeSigned cover the body the carrier carries? Does the
+   encoder (`lib/beam_mcp/signer/cose/cbor.ex`) refuse every float, tag, non-NFC text and
+   non-integer key, and does a carrier re-read by an outside library re-encode identically?
 5. **Randomness.** Ed25519 uses none; ML-DSA-87's comes from OpenSSL's DRBG. Confirm that no
    key or nonce is generated in `lib/`.
 6. **Supply chain and release.** `mix.lock` against `mix hex.audit`; the `beam_mcp` requirement;

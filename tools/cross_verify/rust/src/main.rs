@@ -3,9 +3,12 @@
 
 //! Verifies an ML-DSA-87 signature made by BeamMCP.Signer.MLDSA87 (tools/mldsa_sample.exs) with
 //! aws-lc-rs (AWS-LC's ML-DSA, not OpenSSL's): the signature verifies over the message, and does
-//! not verify over the message with one bit flipped.
+//! not verify over the message with one bit flipped; and the N6 carrier BeamMCP.Signer.COSE made
+//! over the same message (carrier.rs).
 //!
 //!     cargo run --locked --release -- <dir>
+
+mod carrier;
 
 use aws_lc_rs::signature::{UnparsedPublicKey, ML_DSA_87};
 use std::{env, fs, path::Path, process};
@@ -14,7 +17,7 @@ fn read(dir: &Path, name: &str) -> Vec<u8> {
     fs::read(dir.join(name)).unwrap_or_else(|e| fail(&format!("{name}: {e}")))
 }
 
-fn fail(why: &str) -> ! {
+pub(crate) fn fail(why: &str) -> ! {
     println!("FAIL {why}");
     process::exit(1)
 }
@@ -27,7 +30,8 @@ fn main() {
     let dir = Path::new(&args[1]);
     let message = read(dir, "message.bin");
     let signature = read(dir, "signature.bin");
-    let public_key = UnparsedPublicKey::new(&ML_DSA_87, read(dir, "public_key.bin"));
+    let encoded = read(dir, "public_key.bin");
+    let public_key = UnparsedPublicKey::new(&ML_DSA_87, encoded.clone());
 
     if public_key.verify(&message, &signature).is_err() {
         fail("the signature does not verify");
@@ -40,4 +44,6 @@ fn main() {
         fail("the signature also verifies over the message with one bit flipped");
     }
     println!("ok   it does not verify over the message with one bit flipped");
+
+    carrier::verify(&encoded, &message, &read(dir, "carrier.cbor"));
 }

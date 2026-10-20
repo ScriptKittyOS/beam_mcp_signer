@@ -20,11 +20,13 @@ defmodule BeamMCP.Signer.Ed25519.MixProject do
       version: @version,
       elixir: "~> 1.17",
       elixirc_options: [warnings_as_errors: true],
+      # test/support/ holds code the tests load (the strict CBOR reader), not tests.
+      test_ignore_filters: [&String.starts_with?(&1, "test/support/")],
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       package: package(),
       description:
-        "Ed25519 and ML-DSA-87 signers for beam_mcp's canonical connectome bytes, through OTP's :crypto; the host hands the keys in",
+        "Ed25519 and ML-DSA-87 signers for beam_mcp's canonical connectome bytes, raw or in COSE, through OTP's :crypto; the host hands the keys in",
       source_url: @source_url,
       docs: [
         main: "readme",

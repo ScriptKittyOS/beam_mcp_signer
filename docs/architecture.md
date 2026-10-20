@@ -5,8 +5,9 @@ SPDX-License-Identifier: Apache-2.0
 
 # Architecture
 
-Two modules, one function each, one dependency direction. Ed25519 is drawn below; ML-DSA-87
-takes the same path with two keys and a check before it returns.
+Three modules, one function each, one dependency direction. Ed25519 is drawn below; ML-DSA-87
+takes the same path with two keys and a check before it returns; COSE builds a statement around
+the bytes and has ML-DSA-87 sign that.
 
 ```text
  host application
@@ -46,10 +47,18 @@ takes the same path with two keys and a check before it returns.
   :self_check_failed}` when that verifies too) before returning it. The public key is the
   host's because `:crypto` derives none from a seed. On a runtime without ML-DSA-87 (OTP 27,
   or OpenSSL before 3.5) every call is `{:error, :crypto_refused}`.
+- **`BeamMCP.Signer.COSE`** (`lib/beam_mcp/signer/cose.ex`): the same behaviour, MLDSA87's
+  two keys read the same way (each function called once), and `opts[:issuer]`. It builds a
+  statement about the canonical bytes (their SHA-384 and length, and the issuer) and a COSE
+  protected header naming the algorithm (-50) and the key (its SHA-384 thumbprint, computed
+  from the public key), has `BeamMCP.Signer.MLDSA87` sign and check the COSE ToBeSigned over
+  them, and returns the N6 single-signer carrier. Its one `:crypto` call is SHA-384; it calls
+  no signing primitive. Its encoder, `BeamMCP.Signer.COSE.CBOR` (private), writes
+  deterministic CBOR under N6's rules and refuses anything else by name.
 - **`beam_mcp`** (a dependency, `~> 0.7`): defines the behaviour and produces the bytes. It
   holds no key, calls no signing primitive and does not depend on this package.
-- **Erlang/OTP `:crypto`**: performs Ed25519 and ML-DSA-87, through OpenSSL. This package
-  implements no cryptography itself.
+- **Erlang/OTP `:crypto`**: performs Ed25519, ML-DSA-87 and SHA-384, through OpenSSL. This
+  package implements no cryptography itself; the CBOR encoder is an encoding, not a primitive.
 
 ## Properties the arrangement keeps
 

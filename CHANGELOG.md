@@ -7,6 +7,31 @@ SPDX-License-Identifier: Apache-2.0
 
 ## [Unreleased]
 
+### Added: `BeamMCP.Signer.COSE`, ML-DSA-87 in COSE with the algorithm and key signed
+
+- A third module implementing core's `BeamMCP.Signer` behaviour, unchanged. It returns
+  deterministic CBOR, the N6 single-signer carrier: an untagged, detached COSE_Sign1 (RFC 9052,
+  RFC 9964 algorithm -50) whose protected header is `{1: -50, 4: kid, 16: typ}`, over a
+  statement that names the canonical bytes by SHA-384 and length, with the host's issuer. The
+  `kid` is the key's SHA-384 COSE Key Thumbprint (RFC 9679), computed from the public key.
+- **Why:** `Canonical.signature/3` places `scheme:` and `key_id:` beside a raw signature,
+  unsigned; swapping either leaves the signature valid. Here both are inside the signed bytes.
+- **Options:** `BeamMCP.Signer.MLDSA87`'s two keys, read the same way, and `:issuer`
+  (required; NFC text or `{:bytes, binary}`). New errors: `:no_issuer`, `{:issuer, :invalid}`;
+  every other answer is `MLDSA87`'s, which makes and checks the signature.
+- **Provisional:** the statement's schema number (0x85000101) and `typ`
+  (`application/vnd.example.b85.connectome.v0+cose`) are provisional, as is the N6 profile
+  (v0); they change when the shared registry assigns them.
+- **Encoder:** the package's own (private), deterministic CBOR under N6's rules, refusing
+  floats, tags, other simple values, non-integer keys and non-NFC text by name. Held to RFC 8949
+  Appendix A and RFC 9964 Appendix A.2 byte for byte (`tools/vectors_cose.sh` writes the A.2
+  fixture from the RFC); a strict reader in the tests checks every encoding without it.
+- **Other implementations:** CI's cross-verify job also reads the box leg's carrier with Go
+  (fxamacker/cbor, `crypto/mldsa`) and Rust (coset, ciborium, aws-lc-rs), each building
+  ToBeSigned itself; each refuses the signature with the algorithm, key or `typ` changed.
+- `mldsa87_test.exs`: a key-reference test's `send(...) && key` became two expressions, which
+  Elixir 1.20's type checker no longer warns about.
+
 ### Added: `BeamMCP.Signer.MLDSA87`, an ML-DSA-87 signer
 
 - A second module implementing core's `BeamMCP.Signer` behaviour, unchanged: ML-DSA-87

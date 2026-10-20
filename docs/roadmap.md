@@ -36,6 +36,12 @@ implementing the same behaviour (`BeamMCP.Signer.MLDSA87`), for CNSA 2.0, which 
 the signature for national security systems acquired from 2027. A third is not planned; if one
 is ever needed it follows the same rule, decided in the open.
 
+A third module wraps the second rather than adding an algorithm: `BeamMCP.Signer.COSE` signs
+the same ML-DSA-87 inside COSE, so the algorithm and the key are named in the signed bytes and
+not only beside them, in the deterministic-CBOR form (N6) Script Kitty's systems share. The
+RFC 9995 hash envelope, for artifacts too large to hand over whole, is next, as its own mode
+and not a claimed one until its standing under CNSA 2.0 is settled.
+
 ## How it changes
 
 A change to this page is made in the pull request that changes direction, and recorded in the

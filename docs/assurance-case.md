@@ -20,6 +20,12 @@ ML-DSA-87 signature (FIPS 204, pure, empty context) over exactly the bytes given
 under that public key, or no signature at all; it reads the keys from nowhere else, keeps no
 copy of them, and returns nothing that contains them.**
 
+**Given the same two keys and an issuer, `BeamMCP.Signer.COSE.sign/2` returns deterministic
+CBOR, the N6 single-signer carrier, whose ML-DSA-87 signature covers a statement naming the
+given bytes by SHA-384 and length together with a protected header naming the algorithm (-50)
+and the key (its SHA-384 thumbprint, computed from the public key); changing any of them makes
+the signature invalid. It reads the keys and the issuer from nowhere else and keeps nothing.**
+
 ## Threat model
 
 The asset is the host's private key; the goal is that this package adds no way for it to be
@@ -33,6 +39,8 @@ read, kept or misused beyond the host's own call.
 | The key printed in an exception or a log line | yes | nothing `sign/2` meets is raised: a mistyped call is answered `{:error, :bad_arguments}` (so is an improper list whose end comes before a `:private_key` entry), a failing key function `{:error, {:private_key, :unreadable}}`, a refusal from `:crypto` `{:error, :crypto_refused}`; the key passed by reference prints as `#Function<...>` wherever the options are printed, core's frames included (tested through core) |
 | A signature over bytes other than those given, or a non-standard signature | yes | the bytes go to `:crypto.sign/4` unaltered, with the algorithm and `:none` as literals and no options argument (census); tests verify with `:crypto.verify/5` and with core's `encode!/2` bytes |
 | ML-DSA-87: a signature that does not verify under the key the host publishes (a seed and public key that are not a pair, a faulted signature) | yes | every signature is verified under the given public key, and must not verify over bytes one bit away, before it is returned; otherwise a named error and no signature |
+| The algorithm or the key named beside a signature swapped (scheme and key id are host-asserted, outside the signed bytes) | yes, for `BeamMCP.Signer.COSE` | alg and kid are in the COSE protected header, inside ToBeSigned; tests, and Go and Rust verifiers in CI, show the signature fails once either is changed. The two raw-signature modules do not address it, by their shape |
+| COSE output a verifier reads differently (non-deterministic CBOR, an extra header label, a tagged or attached Sign1) | yes | the encoder writes RFC 8949 §4.2.1 under N6's rules and refuses everything else by name, held to RFC 8949 Appendix A and RFC 9964 A.2 byte for byte; the header is exactly `{1, 4, 16}`; two non-Elixir libraries (fxamacker/cbor, coset) re-read it in CI |
 | Weak randomness | yes | Ed25519 uses none (deterministic, RFC 8032). ML-DSA-87 is hedged: OpenSSL's DRBG supplies the per-signature `rnd`; were it constant, signing would be FIPS 204's deterministic variant, which is also approved. No key is generated here |
 | The host's key storage, the node the host runs, OpenSSL defects | no | the host's and upstream's; stated in `SECURITY.md` |
 | Code already running in the same BEAM node | no | the BEAM has no in-node isolation; any process there can read the host's memory |
@@ -52,7 +60,7 @@ read, kept or misused beyond the host's own call.
 
 | principle | here |
 |---|---|
-| Economy of mechanism | two modules, one public function each; remote calls `:crypto.sign/4`, and `:crypto.verify/5` for ML-DSA-87's check, pinned by census |
+| Economy of mechanism | three modules, one public function each, and a private encoder; remote calls `:crypto.sign/4`, `:crypto.verify/5` for ML-DSA-87's check, and `:crypto.hash/2` (SHA-384) in COSE, pinned by census |
 | Fail-safe defaults | no default key; a missing or malformed key is an error, never a signature |
 | Complete mediation | the key is checked on every call; nothing is cached |
 | Open design | standard Ed25519 and ML-DSA-87, verifiable by any implementation; the source is Apache-2.0 |
