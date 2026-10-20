@@ -28,13 +28,14 @@ date, so the bus factor is two, and his reviews are the public record of it.
 
 1. A branch and a pull request; nothing is pushed to `main` directly.
 2. CI on four OTP/Elixir legs (the floor, the pinned line, the newest, and the box: OTP
-   28.5.0.8 with Elixir 1.20.4 on aarch64, over an OpenSSL that offers ML-DSA-87), the REUSE
-   lint and the DCO check.
+   28.5.0.8 with Elixir 1.20.4 on aarch64, over an OpenSSL that offers ML-DSA-87), the box
+   leg's ML-DSA-87 signature verified by two other implementations (Go's `crypto/mldsa` and
+   aws-lc-rs), the REUSE lint and the DCO check.
 3. The maintainer's review, then a rebase merge.
 
 From 2026-09-26 a repository ruleset on `main` holds steps 1 to 3 rather than leaving them to
 habit, as `beam_mcp`'s does: no deletion or force-push, changes by pull request only, a rebase
-merge and linear history, and the six checks above required and up to date, with no bypass.
+merge and linear history, and the seven checks above required and up to date, with no bypass.
 4. A release is a signed tag and a hex.pm publish by the maintainer, recorded in the
    CHANGELOG; `docs/verifying-releases.md` says how to check one.
 

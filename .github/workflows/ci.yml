@@ -63,6 +63,50 @@ jobs:
       - run: mix credo --strict
       - run: mix hex.audit
       - run: mix test
+      # The box leg's ML-DSA-87 signature, for the cross-verify job to check with two other
+      # implementations (tools/mldsa_sample.exs; the key pair is a published ACVP test vector).
+      - name: an ML-DSA-87 signature for other implementations to verify
+        if: matrix.leg == 'box'
+        run: mix run tools/mldsa_sample.exs mldsa87-sample
+      # Recorded, not asserted: a shared runner's latency is the runner's, never a box's figure.
+      - name: ML-DSA-87 latency on this runner (recorded, no threshold)
+        if: matrix.leg == 'box'
+        run: mix run tools/bench_mldsa.exs 500
+      - if: matrix.leg == 'box'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mldsa87-sample
+          path: mldsa87-sample/
+          if-no-files-found: error
+          retention-days: 7
+
+  # BeamMCP.Signer.MLDSA87's output, verified by two ML-DSA implementations other than the
+  # OpenSSL that made it: Go's crypto/mldsa (which also derives the public key from the seed,
+  # as OTP cannot) and AWS-LC through aws-lc-rs. Each must accept the signature and refuse it
+  # over the message with one bit flipped (tools/cross_verify/).
+  cross-verify:
+    name: ML-DSA-87 cross-verify (Go crypto/mldsa, aws-lc-rs)
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: mldsa87-sample
+          path: mldsa87-sample
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3"
+          cache: false
+      - name: Go crypto/mldsa
+        working-directory: tools/cross_verify/go
+        run: go run . "$GITHUB_WORKSPACE/mldsa87-sample"
+      - name: aws-lc-rs (the toolchain and every crate pinned)
+        working-directory: tools/cross_verify/rust
+        run: |
+          rustup toolchain install 1.92.0 --profile minimal
+          RUSTFLAGS="-D warnings" cargo +1.92.0 run --locked --release -- "$GITHUB_WORKSPACE/mldsa87-sample"
 
 
   reuse:

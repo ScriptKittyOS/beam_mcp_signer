@@ -12,3 +12,6 @@ erl_crash.dump
 /config/*.secret.exs
 .elixir_ls/
 *.tar
+
+# the cross-verify tool's build directory (tools/cross_verify/rust)
+/tools/cross_verify/rust/target/

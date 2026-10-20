@@ -229,11 +229,15 @@ defmodule BeamMCP.Signer.Ed25519Test do
   test "the key is not held: no process, ets, persistent_term or application state after a call" do
     {_pub, priv} = keypair()
     before = {Process.get(), :persistent_term.get(), Application.get_all_env(:beam_mcp_signer)}
+    tables = :ets.all()
     {:ok, _} = Ed25519.sign("abc", private_key: priv)
 
     assert {Process.get(), :persistent_term.get(), Application.get_all_env(:beam_mcp_signer)} ==
              before
 
-    refute Enum.any?(:ets.all(), fn t -> :ets.info(t, :name) |> to_string() =~ ~r/signer|key/i end)
+    # A table the call made would be owned by this process (the module starts none). Matching
+    # on names instead caught ExUnit's own per-module tables, named after the test modules,
+    # whenever another test file was still compiling.
+    refute Enum.any?(:ets.all() -- tables, &(:ets.info(&1, :owner) == self()))
   end
 end

@@ -1,0 +1,6 @@
+SPDX-FileCopyrightText: National Institute of Standards and Technology (usnistgov/ACVP-Server)
+SPDX-License-Identifier: NIST-Software
+
+Changed 2026-10-20 by Sudo Apt Holdings LLC: filtered to ML-DSA-87 and compacted by
+tools/vectors_mldsa87.sh, which names the source commit; the cases themselves are unchanged.
+Source: the National Institute of Standards and Technology, ACVP-Server.
