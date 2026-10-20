@@ -93,8 +93,16 @@ defmodule BeamMCP.Signer.MLDSA87Test do
 
   test "both keys by reference: each function called once per signature" do
     me = self()
-    seed = fn -> send(me, :seed) && @seed end
-    pub = fn -> send(me, :pub) && @pub end
+
+    seed = fn ->
+      send(me, :seed)
+      @seed
+    end
+
+    pub = fn ->
+      send(me, :pub)
+      @pub
+    end
 
     assert {:ok, sig} = MLDSA87.sign("abc", private_key: seed, public_key: pub)
     assert verify("abc", sig)

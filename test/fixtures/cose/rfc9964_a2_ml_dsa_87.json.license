@@ -1,0 +1,7 @@
+SPDX-FileCopyrightText: 2026 IETF Trust and the persons identified as the document authors (RFC 9964)
+SPDX-License-Identifier: BSD-3-Clause
+
+Extracted 2026-10-20 by Sudo Apt Holdings LLC from RFC 9964, Appendix A.2, Figure 8, by
+tools/vectors_cose.sh, which pins the RFC text by sha256; the values are unchanged, the
+`_diag` renderings dropped. Code Components extracted from an IETF document are provided
+under the Revised BSD License, per Section 4.e of the IETF Trust Legal Provisions.

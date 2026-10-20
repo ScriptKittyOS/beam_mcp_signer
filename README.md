@@ -8,13 +8,16 @@ SPDX-License-Identifier: Apache-2.0
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14775/badge)](https://www.bestpractices.dev/projects/14775)
 
 Signers for [`beam_mcp`](https://github.com/ScriptKittyOS/beam_mcp)'s canonical connectome
-bytes, through OTP's `:crypto`. Two modules, each implementing core's `BeamMCP.Signer`
+bytes, through OTP's `:crypto`. Three modules, each implementing core's `BeamMCP.Signer`
 behaviour (`sign/2`) and nothing else:
 
 - **`BeamMCP.Signer.Ed25519`**: Ed25519 (RFC 8032), a 64-byte signature.
 - **`BeamMCP.Signer.MLDSA87`**: ML-DSA-87 (FIPS 204), the post-quantum signature CNSA 2.0
   names, a 4,627-byte signature. It needs an OTP whose `:crypto` is linked to OpenSSL 3.5 or
   later; see [ML-DSA-87](#ml-dsa-87) below.
+- **`BeamMCP.Signer.COSE`**: the same ML-DSA-87 signature inside COSE (RFC 9964, algorithm
+  -50), with the algorithm and the key's thumbprint in the signed bytes; see [COSE](#cose)
+  below.
 
 **What they sign.** Exactly the bytes `BeamMCP.Connectome.Canonical.encode/2` produces, as
 `Canonical.signature/3` hands them over; the signature comes back beside them. Nothing else:
@@ -89,10 +92,63 @@ true = :crypto.verify(:mldsa87, :none, BeamMCP.Connectome.Canonical.encode!(grap
   over the message with one bit flipped, and Go also confirms the public key is the one the
   seed derives (`tools/cross_verify/`).
 
-## Either module
+## COSE
 
-This package reads the key options and nothing else (`opts[:private_key]`, and for ML-DSA-87
-`opts[:public_key]`) -- no environment variable, no file, no application config, no default.
+`BeamMCP.Signer.COSE` fixes what a raw signature cannot: `Canonical.signature/3` places
+`scheme:` and `key_id:` beside the signature, asserted by the host and verified by nobody, so
+swapping either leaves a raw signature valid. Here the algorithm and the key's thumbprint sit
+in the COSE protected header, inside the signed bytes.
+
+```elixir
+{:ok, %{signature: carrier}} =
+  BeamMCP.Connectome.Canonical.signature(graph, BeamMCP.Signer.COSE,
+    private_key: fn -> seed end, public_key: fn -> public_key end, issuer: "box-17")
+```
+
+The keys are `BeamMCP.Signer.MLDSA87`'s, read the same way, and that module makes and checks
+the signature. `:issuer` is required: UTF-8 text in NFC, or `{:bytes, binary}`.
+
+What comes back is one binary, deterministic CBOR, in the form Script Kitty's systems share for
+everything they sign (the N6 profile, v0; provisional until its v1):
+
+```
+{0: 0xFFFF0003,                                        ; the single-signer carrier
+ 1: h'<body>',
+ 2: [h'<protected>', {}, null, h'<signature>']}        ; COSE_Sign1, untagged, detached
+
+protected = {1: -50,                                   ; alg: ML-DSA-87
+             4: h'<48 bytes>',                         ; kid: SHA-384 COSE Key Thumbprint
+             16: "application/vnd.example.b85.connectome.v0+cose"}   ; typ
+body      = {0: 0x85000101,                            ; the statement's schema
+             1: "<issuer>",
+             2: {0: [-43, h'<SHA-384 of the canonical bytes>'], 1: <their length>,
+                 2: "application/json"}}
+```
+
+**To verify**, with the canonical bytes beside the carrier and the public key from your own key
+registry:
+
+1. Decode the carrier, the protected header and the body, refusing anything that is not
+   deterministic CBOR.
+2. Require the protected header to be exactly `{1: -50, 4: kid, 16: typ}`, with `kid` the
+   SHA-384 of `a3 01 07 03 38 31 20 59 0a 20` followed by the 2,592-byte public key (RFC 9679
+   over the AKP key).
+3. Verify the signature, pure ML-DSA-87 with an empty context, over
+   `["Signature1", protected, h'', body]` (RFC 9052 section 4.4), the protected bytes as
+   received.
+4. Require the body's digest and length to be the canonical bytes'.
+
+`tools/cross_verify/` does exactly this in Go (`fxamacker/cbor` and `crypto/mldsa`) and in Rust
+(`coset`, `ciborium` and aws-lc-rs), and CI runs both on the box leg's carrier on every change.
+The schema number and `typ` are provisional and change when the shared registry assigns them.
+The encoder is this package's own: no Elixir library writes deterministic CBOR or COSE with
+ML-DSA. It is held to RFC 8949 Appendix A and to RFC 9964 Appendix A.2, byte for byte.
+
+## Any module
+
+This package reads the key options, and for COSE the issuer, and nothing else
+(`opts[:private_key]`, for ML-DSA-87 `opts[:public_key]`, for COSE `opts[:issuer]`) -- no
+environment variable, no file, no application config, no default.
 Where the keys live between calls is the host's decision.
 
 **Core is a separate package.** `beam_mcp` holds no key and calls no signing primitive; it is

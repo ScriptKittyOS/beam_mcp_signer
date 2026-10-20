@@ -12,3 +12,5 @@ if System.get_env("MLDSA_REQUIRED") == "1" and not mldsa87? do
 end
 
 ExUnit.start(exclude: if(mldsa87?, do: [:no_mldsa87], else: [:mldsa87]))
+
+Code.require_file("support/strict_cbor.exs", __DIR__)

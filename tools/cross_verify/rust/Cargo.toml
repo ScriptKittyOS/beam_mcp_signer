@@ -11,3 +11,5 @@ publish = false
 # pins every crate.
 [dependencies]
 aws-lc-rs = "=1.18.2"
+ciborium = "=0.2.2"
+coset = "=0.4.2"

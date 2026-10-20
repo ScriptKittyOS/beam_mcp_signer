@@ -7,10 +7,16 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
   # a call the beam shows.
   use ExUnit.Case, async: true
 
-  alias BeamMCP.Signer.{Ed25519, MLDSA87}
+  alias BeamMCP.Signer.{COSE, Ed25519, MLDSA87}
+  alias BeamMCP.Signer.COSE.CBOR
 
   @lib Path.wildcard(Path.expand("../../../lib/**/*.ex", __DIR__))
-  @source %{Ed25519 => "ed25519.ex", MLDSA87 => "mldsa87.ex"}
+  @source %{
+    Ed25519 => "ed25519.ex",
+    MLDSA87 => "mldsa87.ex",
+    COSE => "cose.ex",
+    CBOR => "cbor.ex"
+  }
 
   @key_source ~r/System\.(get_env|fetch_env!?|cmd)|:os\.(getenv|cmd)|Application\.(get_env|fetch_env!?|get_all_env)|File\.|Path\.expand|~\/|\.ssh|HEX_API_KEY|_KEY"|:persistent_term|:ets\.|Process\.(get|put)|Code\.eval|:init\.get_argument/
 
@@ -41,7 +47,7 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
   # ML-DSA is not HashML-DSA but pure ML-DSA over the digest.
   @crypto_args %{Ed25519 => {:eddsa, :none}, MLDSA87 => {:mldsa87, :none}}
 
-  test "the package is the two signer modules, and no line under lib/ names an environment, file, config or store read" do
+  test "the package is the three signer modules and the encoder, and no line under lib/ names an environment, file, config or store read" do
     assert @lib |> Enum.map(&Path.basename/1) |> Enum.sort() ==
              @source |> Map.values() |> Enum.sort()
 
@@ -88,6 +94,40 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
     end
   end
 
+  # The COSE module signs nothing itself: its one `:crypto` call is SHA-384 (the thumbprint and
+  # the digest of the canonical bytes), and the signature is MLDSA87's, checked there. Its
+  # encoder calls no `:crypto` and nothing outside the VM. Both lists are the beams' whole truth.
+  test "BeamMCP.Signer.COSE: SHA-384, the encoder and MLDSA87.sign/2, and no signing primitive of its own" do
+    assert remote_calls(COSE) == [
+             {CBOR, :encode, 1},
+             {MLDSA87, :sign, 2},
+             {:crypto, :hash, 2},
+             {:erlang, :byte_size, 1},
+             {:erlang, :get_module_info, 2},
+             {:erlang, :is_binary, 1},
+             {:erlang, :is_function, 2},
+             {:erlang, :is_list, 1}
+           ]
+
+    for args <- collect_crypto_args(forms(COSE)) do
+      assert [{:atom, _, :sha384} | _] = args
+    end
+  end
+
+  test "BeamMCP.Signer.COSE.CBOR: pure encoding, no :crypto, no I/O" do
+    calls = remote_calls(CBOR)
+
+    assert Enum.map(calls, &elem(&1, 0)) |> Enum.uniq() |> Enum.sort() == [
+             Enum,
+             String,
+             :erlang,
+             :unicode
+           ]
+
+    assert {:unicode, :characters_to_nfc_binary, 1} in calls
+    assert {String, :valid?, 1} in calls
+  end
+
   test "Ed25519: the private key is 32 bytes, given directly or by a zero-arity reference, and the seed length is a module constant" do
     src = source(Ed25519)
     assert src =~ "@private_key_bytes 32"
@@ -105,6 +145,15 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
     assert src =~ ~r/resolve\(key\) when is_function\(key, 0\) do\s+\{:ok, key\.\(\)\}/
     refute src =~ ~r/(private|public)_key:\s*<</, "a literal key under lib/"
     assert src =~ "{:seed, seed}", "signs from the seed, never from a stored expanded key"
+  end
+
+  defp remote_calls(module) do
+    module
+    |> forms()
+    |> collect_remote_calls()
+    |> Enum.reject(fn {m, _f, _a} -> m == module end)
+    |> Enum.uniq()
+    |> Enum.sort()
   end
 
   defp source(module), do: File.read!(Enum.find(@lib, &(Path.basename(&1) == @source[module])))

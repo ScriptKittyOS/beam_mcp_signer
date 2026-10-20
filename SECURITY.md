@@ -32,8 +32,9 @@ No paid bounty and no guaranteed fix deadline.
 The security requirements a host can rely on, each held by a test in `test/`:
 
 - **The key is read from one place.** `sign/2` reads the private key from
-  `opts[:private_key]` (and `BeamMCP.Signer.MLDSA87` also the public key, from
-  `opts[:public_key]`) on each call and from nowhere else: no environment variable, file,
+  `opts[:private_key]` (and `BeamMCP.Signer.MLDSA87` and `BeamMCP.Signer.COSE` also the
+  public key, from `opts[:public_key]`, and COSE the issuer, from `opts[:issuer]`) on each call
+  and from nowhere else: no environment variable, file,
   application config, default key or store. A two-layer census holds it
   (`test/beam_mcp/signer/no_key_source_test.exs`).
 - **The key does not leave in a result or an exception.** Every return value is a signature or
@@ -56,6 +57,11 @@ The security requirements a host can rely on, each held by a test in `test/`:
   verified under that key, and must not verify over bytes one bit away, before it is returned;
   otherwise the answer is a named error and no signature
   (`test/beam_mcp/signer/mldsa87_test.exs`).
+- **The COSE carrier names what signed it, inside what is signed.** `BeamMCP.Signer.COSE`
+  returns deterministic CBOR whose ML-DSA-87 signature covers the algorithm (-50), the key's
+  SHA-384 thumbprint (computed from the public key, never taken from the host) and a statement
+  naming the canonical bytes by SHA-384 and length; change any of them and the signature is
+  invalid (`test/beam_mcp/signer/cose_test.exs`; Go and Rust verifiers in CI).
 - **Randomness.** Ed25519 signing is deterministic and uses none. ML-DSA-87 signing is hedged:
   OpenSSL's DRBG supplies per-signature randomness, and FIPS 204's construction keeps the
   signature secure if that randomness fails. The package generates no key and no nonce.
