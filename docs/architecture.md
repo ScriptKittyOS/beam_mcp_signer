@@ -5,7 +5,8 @@ SPDX-License-Identifier: Apache-2.0
 
 # Architecture
 
-One module, one function, one dependency direction.
+Two modules, one function each, one dependency direction. Ed25519 is drawn below; ML-DSA-87
+takes the same path with two keys and a check before it returns.
 
 ```text
  host application
@@ -36,17 +37,29 @@ One module, one function, one dependency direction.
   entry), a key function that raises, throws or exits is answered
   `{:error, {:private_key, :unreadable}}`, and a refusal from `:crypto` is answered
   `{:error, :crypto_refused}`.
+- **`BeamMCP.Signer.MLDSA87`** (`lib/beam_mcp/signer/mldsa87.ex`): the same behaviour and the
+  same rules for a key, with two: the 32-byte seed under `opts[:private_key]` and the
+  2,592-byte public key under `opts[:public_key]`, each bytes or a zero-arity function called
+  once. It signs with `:crypto.sign(:mldsa87, :none, canonical_bytes, {:seed, seed})`, then
+  verifies the signature under the public key (`{:error, {:public_key, :does_not_verify}}`
+  when the two keys are not a pair) and over bytes one bit away (`{:error,
+  :self_check_failed}` when that verifies too) before returning it. The public key is the
+  host's because `:crypto` derives none from a seed. On a runtime without ML-DSA-87 (OTP 27,
+  or OpenSSL before 3.5) every call is `{:error, :crypto_refused}`.
 - **`beam_mcp`** (a dependency, `~> 0.7`): defines the behaviour and produces the bytes. It
   holds no key, calls no signing primitive and does not depend on this package.
-- **Erlang/OTP `:crypto`**: performs Ed25519. This package implements no cryptography itself.
+- **Erlang/OTP `:crypto`**: performs Ed25519 and ML-DSA-87, through OpenSSL. This package
+  implements no cryptography itself.
 
 ## Properties the arrangement keeps
 
 - **The key lives with the host.** Nothing is stored between calls: no process, table,
   persistent term, application environment or file. A test checks that no state remains after
   a call.
-- **One way in.** The key has one source, the call's options; a census over both the source
-  and the compiled module holds that (`test/beam_mcp/signer/no_key_source_test.exs`).
+- **One way in.** The keys have one source, the call's options; a census over both the source
+  and the compiled modules holds that, and that every `:crypto` call names its algorithm and
+  `:none` as literals and takes no options argument
+  (`test/beam_mcp/signer/no_key_source_test.exs`).
 - **Core stays keyless.** Authority (a key, a signature) is kept out of `beam_mcp` by putting
   it here, in a package a host chooses to add.
 

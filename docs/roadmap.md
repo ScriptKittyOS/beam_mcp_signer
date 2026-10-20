@@ -14,7 +14,8 @@ are not promised; the order is.
    reaches no exception report; a mistyped call is answered, not raised.
 2. **Follow `beam_mcp` to `1.0.0`.** The requirement is `~> 0.7` today; when core ships
    `1.0.0`, this package releases with a `~> 1.0` requirement, and then takes its own `1.0.0`
-   once its surface (one function, six results) has stood a release unchanged.
+   once its surface (one function per module, each with its named results) has stood a
+   release unchanged.
 3. **Release tooling as core has it**: the canonical tarball script (in the tree) used for
    every publish, and a build-provenance attestation on each release tag.
 4. **Keep current**: security fixes on `SECURITY.md`'s commitments, dependency updates through
@@ -24,13 +25,16 @@ are not promised; the order is.
 
 - **Store, load, generate or rotate keys.** The host holds the key; this package reads it from
   the call's options and nowhere else. That is the package's reason to exist.
-- **Implement cryptography.** Ed25519 is OTP's `:crypto`, backed by OpenSSL.
+- **Implement cryptography.** Ed25519 and ML-DSA-87 are OTP's `:crypto`, backed by OpenSSL.
 - **Verify signatures or decide what they authorize.** Verification is one standard call any
-  consumer can make; authority is the consumer's.
+  consumer can make; authority is the consumer's. (The ML-DSA-87 signer verifies its own
+  signature before returning it: a check on its output, not a verifier offered to others.)
 - **Make `beam_mcp` depend on it.** The dependency runs one way.
 
-A second algorithm is not planned; if one is ever needed it would be a separate module
-implementing the same behaviour, decided in the open.
+A second algorithm was added as this page said it would be: ML-DSA-87, as a separate module
+implementing the same behaviour (`BeamMCP.Signer.MLDSA87`), for CNSA 2.0, which names it as
+the signature for national security systems acquired from 2027. A third is not planned; if one
+is ever needed it follows the same rule, decided in the open.
 
 ## How it changes
 

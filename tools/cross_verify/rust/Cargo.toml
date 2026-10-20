@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 Sudo Apt Holdings LLC
+# SPDX-License-Identifier: Apache-2.0
+
+[package]
+name = "cross_verify"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# ML-DSA is stable in aws-lc-rs from 1.18 (`aws_lc_rs::signature::ML_DSA_87`); the lock file
+# pins every crate.
+[dependencies]
+aws-lc-rs = "=1.18.2"

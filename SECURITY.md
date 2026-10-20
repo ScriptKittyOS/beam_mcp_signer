@@ -32,7 +32,8 @@ No paid bounty and no guaranteed fix deadline.
 The security requirements a host can rely on, each held by a test in `test/`:
 
 - **The key is read from one place.** `sign/2` reads the private key from
-  `opts[:private_key]` on each call and from nowhere else: no environment variable, file,
+  `opts[:private_key]` (and `BeamMCP.Signer.MLDSA87` also the public key, from
+  `opts[:public_key]`) on each call and from nowhere else: no environment variable, file,
   application config, default key or store. A two-layer census holds it
   (`test/beam_mcp/signer/no_key_source_test.exs`).
 - **The key does not leave in a result or an exception.** Every return value is a signature or
@@ -45,23 +46,30 @@ The security requirements a host can rely on, each held by a test in `test/`:
   or core: not an exception raised earlier in core's `Canonical.signature/3` on a mistyped
   call, not a log line that inspects the options. Passed as bytes, the key is as safe as every
   piece of code that handles the options; tests pin both halves
-  (`test/beam_mcp/signer/ed25519_test.exs`).
+  (`test/beam_mcp/signer/ed25519_test.exs`, `test/beam_mcp/signer/mldsa87_refusals_test.exs`).
 - **The signature is standard Ed25519** (RFC 8032, FIPS 186-5) over exactly the canonical bytes
   `beam_mcp` produced, computed by Erlang/OTP's `:crypto` (OpenSSL), and verifiable by any
   Ed25519 implementation.
-- **No randomness is needed or used.** Ed25519 signing is deterministic; the package generates
-  no key and no nonce.
+- **The ML-DSA-87 signature is standard ML-DSA-87** (FIPS 204, pure, empty context, as RFC
+  9964 requires for COSE) over exactly the canonical bytes, computed by `:crypto` (OpenSSL 3.5
+  or later), and **it verifies under the public key the host handed in**: every signature is
+  verified under that key, and must not verify over bytes one bit away, before it is returned;
+  otherwise the answer is a named error and no signature
+  (`test/beam_mcp/signer/mldsa87_test.exs`).
+- **Randomness.** Ed25519 signing is deterministic and uses none. ML-DSA-87 signing is hedged:
+  OpenSSL's DRBG supplies per-signature randomness, and FIPS 204's construction keeps the
+  signature secure if that randomness fails. The package generates no key and no nonce.
 
 What it does **not** do: store, load, rotate or protect the key between calls (the host's
-decision, `docs/assurance-case.md` says why), verify signatures, or decide what a signature
-authorizes.
+decision, `docs/assurance-case.md` says why), verify others' signatures (the ML-DSA-87 module
+checks only its own, before returning it), or decide what a signature authorizes.
 
 ## Severity, in this package's terms
 
 | level | what it means here |
 |---|---|
 | **Critical** | On a call with the documented types: the key is read from anywhere but the call's options, or reaches a log, an error, a crash report or a return value; or a signature is produced over bytes other than those given. |
-| **High** | A signature that standard Ed25519 verification rejects, or accepts over different bytes. |
+| **High** | A signature that standard Ed25519 or ML-DSA-87 verification rejects, or accepts over different bytes; an ML-DSA-87 signature returned that does not verify under the public key given. |
 | **Medium** | A documented behaviour the package does not match, with a security consequence a host can work around. |
 | **Low** | Wrong error terms or documentation that could mislead. |
 

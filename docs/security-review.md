@@ -21,17 +21,22 @@ boundaries in `docs/assurance-case.md`.
 
 Each item is answered with what was read, what was tried, and what was found.
 
-1. **One source for the key.** Read `lib/beam_mcp/signer/ed25519.ex` in full. Is the key read
-   from `opts[:private_key]` only? Does the census's regex and call list still describe the
+1. **One source for the key.** Read `lib/beam_mcp/signer/ed25519.ex` and
+   `lib/beam_mcp/signer/mldsa87.ex` in full. Is each key read from its option only
+   (`:private_key`, and `:public_key` for ML-DSA-87)? Does the census's regex and call list still describe the
    compiled module (`test/beam_mcp/signer/no_key_source_test.exs`)?
 2. **Nothing kept.** No process state, table, persistent term, application environment or
    file after a call; a reference (`fn -> key end`) called once and dropped.
 3. **Nothing printed.** Every result is a signature or a fixed error term; no clause can raise
    on its arguments. Try a map for the options, a non-binary for the bytes, a wrong-length key
    and a reference returning the wrong thing, and read what comes back and what a log would show.
-4. **The signature.** Ed25519 over exactly the bytes given, verified independently with
-   `:crypto.verify/5` and through `beam_mcp`'s canonical bytes; no prehash, no other algorithm.
-5. **Randomness.** None is used; confirm that no key or nonce is generated in `lib/`.
+4. **The signature.** Ed25519 and ML-DSA-87 over exactly the bytes given, verified
+   independently with `:crypto.verify/5` and through `beam_mcp`'s canonical bytes; the digest
+   type `:none` and no options argument, so no prehash and no context. For ML-DSA-87: does the
+   check before return refuse a seed with the wrong public key, and does the suite's vector
+   count still match the fixtures?
+5. **Randomness.** Ed25519 uses none; ML-DSA-87's comes from OpenSSL's DRBG. Confirm that no
+   key or nonce is generated in `lib/`.
 6. **Supply chain and release.** `mix.lock` against `mix hex.audit`; the `beam_mcp` requirement;
    workflow permissions and pinned actions; a release tarball rebuilt with
    `tools/release_tarball.sh` and compared with hex.pm's checksum; the tag's signature

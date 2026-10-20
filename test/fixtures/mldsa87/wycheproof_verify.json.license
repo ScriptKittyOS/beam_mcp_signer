@@ -1,0 +1,5 @@
+SPDX-FileCopyrightText: The Wycheproof authors (C2SP/wycheproof)
+SPDX-License-Identifier: Apache-2.0
+
+Changed 2026-10-20 by Sudo Apt Holdings LLC: compacted, with a source field added, by
+tools/vectors_mldsa87.sh, which names the source commit; the cases themselves are unchanged.

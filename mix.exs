@@ -9,7 +9,9 @@ defmodule BeamMCP.Signer.Ed25519.MixProject do
 
   # The same floor as beam_mcp: the behaviour this package implements lives there, and one
   # OTP line for both is one fewer thing for a host to reason about. Ed25519 in `:crypto` is
-  # far older than 27; the floor is core's, not this package's.
+  # far older than 27; the floor is core's, not this package's. ML-DSA-87 needs more (OTP 28.1
+  # or later, linked to OpenSSL 3.5 or later) and answers `:crypto_refused` below it, so the
+  # floor is not raised for it: a host on OTP 27 keeps Ed25519.
   @otp_floor 27
 
   def project do
@@ -22,7 +24,7 @@ defmodule BeamMCP.Signer.Ed25519.MixProject do
       deps: deps(),
       package: package(),
       description:
-        "Ed25519 signer for beam_mcp's canonical connectome bytes, through OTP's :crypto; the host hands the key in",
+        "Ed25519 and ML-DSA-87 signers for beam_mcp's canonical connectome bytes, through OTP's :crypto; the host hands the keys in",
       source_url: @source_url,
       docs: [
         main: "readme",
@@ -50,7 +52,7 @@ defmodule BeamMCP.Signer.Ed25519.MixProject do
       # this package touches nothing but that behaviour and `Canonical.signature/3`'s bytes.
       # So two numbers here, on purpose: the requirement spans core's 0.7, 0.8 and any 0.9,
       # stops at 1.0.0, and a host is not held on the previous core minor by this package
-      # (0.1.0's `~> 0.7.0` did exactly that at core's 0.8.0). Nothing else: Ed25519 is OTP's.
+      # (0.1.0's `~> 0.7.0` did exactly that at core's 0.8.0). Nothing else: both algorithms are OTP's.
       {:beam_mcp, "~> 0.7"},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}

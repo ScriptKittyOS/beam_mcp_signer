@@ -7,6 +7,37 @@ SPDX-License-Identifier: Apache-2.0
 
 ## [Unreleased]
 
+### Added: `BeamMCP.Signer.MLDSA87`, an ML-DSA-87 signer
+
+- A second module implementing core's `BeamMCP.Signer` behaviour, unchanged: ML-DSA-87
+  (FIPS 204), pure, external interface, empty context, the form RFC 9964 requires for COSE.
+  `Ed25519` is untouched.
+- **Two keys on every call:** the 32-byte seed under `:private_key` and its 2,592-byte public
+  key under `:public_key`, each as bytes or a zero-arity function. The public key is required
+  because `:crypto` cannot derive one from a seed.
+- **Every signature is checked before it is returned:** it must verify under the given public
+  key (`{:error, {:public_key, :does_not_verify}}` otherwise, so a seed and public key that
+  are not a pair produce no signature) and must not verify over bytes one bit away
+  (`{:error, :self_check_failed}` otherwise).
+- **Hedged signing:** two signatures of the same bytes differ.
+- **Where it runs:** OTP 28.1 or later with `:crypto` linked to OpenSSL 3.5 or later. Elsewhere,
+  OTP 27 included, every call answers `{:error, :crypto_refused}`; the package's floor stays
+  OTP 27 for Ed25519.
+- **Tests:** the ML-DSA-87 tests run on CI's box leg, which fails if `:crypto` lacks the
+  algorithm. The suite holds the runtime to NIST ACVP and Wycheproof ML-DSA-87 vectors, every
+  case `:crypto` can express, and counts the rest by reason (`tools/vectors_mldsa87.sh` writes
+  the fixtures at pinned commits). A new CI job verifies the box leg's signature with Go's
+  `crypto/mldsa` and aws-lc-rs (`tools/cross_verify/`); it is the seventh required check.
+- **Docs:** the README, `SECURITY.md`, the assurance case, the architecture page, the security
+  review checklist and the roadmap describe both modules.
+
+### Changed: a test of Ed25519's "nothing kept" claim
+
+- `ed25519_test.exs` looked for an ETS table named like "signer" or "key" after a call; with
+  more test files compiling, ExUnit's per-module tables (named after the test modules) matched.
+  It now compares the tables before and after the call and refuses any new one owned by the
+  calling process, which is what a table made by the call would be.
+
 ### Added: build provenance for each release
 
 - `.github/workflows/provenance.yml`: on a release tag, CI builds the tarball with

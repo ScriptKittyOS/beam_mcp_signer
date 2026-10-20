@@ -22,7 +22,10 @@ mix test
 Erlang/OTP 27 or newer and Elixir 1.17 or newer, the same floor as `beam_mcp`. CI runs
 `mix format --check-formatted`, `mix compile --warnings-as-errors`, `mix credo --strict`,
 `mix hex.audit` and `mix test` on four OTP/Elixir legs, after checking the runtime is at or above
-its line's patched OTP floor (`tools/otp_floor.sh`); run the same before you push.
+its line's patched OTP floor (`tools/otp_floor.sh`); run the same before you push. The
+ML-DSA-87 tests run only where `:crypto` offers the algorithm (OpenSSL 3.5 or later); CI's box
+leg requires it (`MLDSA_REQUIRED=1`), and a job verifies that leg's signature with Go's
+`crypto/mldsa` and aws-lc-rs (`tools/cross_verify/`).
 
 ## The rules, all enforced
 
