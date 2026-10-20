@@ -28,7 +28,8 @@ date, so the bus factor is two, and his reviews are the public record of it.
 
 1. A branch and a pull request; nothing is pushed to `main` directly.
 2. CI on four OTP/Elixir legs (the floor, the pinned line, the newest, and the box: OTP
-   28.5.0.8 with Elixir 1.20.4 on aarch64), the REUSE lint and the DCO check.
+   28.5.0.8 with Elixir 1.20.4 on aarch64, over an OpenSSL that offers ML-DSA-87), the REUSE
+   lint and the DCO check.
 3. The maintainer's review, then a rebase merge.
 
 From 2026-09-26 a repository ruleset on `main` holds steps 1 to 3 rather than leaving them to
