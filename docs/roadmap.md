@@ -39,8 +39,9 @@ is ever needed it follows the same rule, decided in the open.
 A third module wraps the second rather than adding an algorithm: `BeamMCP.Signer.COSE` signs
 the same ML-DSA-87 inside COSE, so the algorithm and the key are named in the signed bytes and
 not only beside them, in the deterministic-CBOR form (N6) Script Kitty's systems share. The
-RFC 9995 hash envelope, for artifacts too large to hand over whole, is next, as its own mode
-and not a claimed one until its standing under CNSA 2.0 is settled.
+RFC 9995 hash envelope, for artifacts too large to hand over whole, is its own module beside
+it (`BeamMCP.Signer.COSE.HashEnvelope`), outside the behaviour. It is not a claimed path until
+its standing under CNSA 2.0 is settled.
 
 ## How it changes
 

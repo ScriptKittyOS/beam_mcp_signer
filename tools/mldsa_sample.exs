@@ -1,15 +1,17 @@
 # SPDX-FileCopyrightText: 2026 Sudo Apt Holdings LLC
 # SPDX-License-Identifier: Apache-2.0
 #
-# Writes one ML-DSA-87 signature made by BeamMCP.Signer.MLDSA87, and one N6 carrier made by
-# BeamMCP.Signer.COSE, for other implementations to verify (tools/cross_verify/): the canonical
-# bytes of a fixed graph, the signature over them, the carrier over them, and the key pair both
-# were made with, ACVP's published keyGen case (tgId 3, tcId 51), so the
+# Writes one ML-DSA-87 signature made by BeamMCP.Signer.MLDSA87, one N6 carrier made by
+# BeamMCP.Signer.COSE and one hash envelope made by BeamMCP.Signer.COSE.HashEnvelope, for other
+# implementations to verify (tools/cross_verify/): the canonical bytes of a fixed graph, the
+# signature, the carrier and the hash envelope over them, and the key pair all three were made with, ACVP's published keyGen case (tgId 3, tcId 51), so the
 # seed is a test vector and no secret. Run on CI's box leg:
 #
 #   MIX_ENV=test mix run tools/mldsa_sample.exs <dir>
 #
-# Writes <dir>/message.bin, signature.bin, carrier.cbor, public_key.bin, seed.bin.
+# Writes <dir>/message.bin, signature.bin, carrier.cbor, hash-envelope.cbor, public_key.bin,
+# seed.bin. The hash envelope is streamed from the message in 7-byte chunks, so the verifiers'
+# digest check also checks the stream.
 alias BeamMCP.Connectome.{Canonical, Edge, Graph, Node}
 
 [dir] = System.argv()
@@ -41,10 +43,24 @@ message = Canonical.encode!(graph, algorithm: :sha384)
     issuer: "beam_mcp_signer.ci"
   )
 
+{:ok, hash_envelope} =
+  BeamMCP.Signer.COSE.HashEnvelope.sign_stream(
+    Stream.unfold(message, fn
+      <<>> -> nil
+      <<chunk::binary-size(7), rest::binary>> -> {chunk, rest}
+      tail -> {tail, <<>>}
+    end),
+    private_key: fn -> seed end,
+    public_key: fn -> public_key end,
+    typ: "application/vnd.example.b80.test_hash.v0+cose",
+    preimage_type: "application/json"
+  )
+
 for {name, bytes} <- [
       {"message.bin", message},
       {"signature.bin", signature},
       {"carrier.cbor", carrier},
+      {"hash-envelope.cbor", hash_envelope},
       {"public_key.bin", public_key},
       {"seed.bin", seed}
     ] do

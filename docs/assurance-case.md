@@ -26,6 +26,13 @@ given bytes by SHA-384 and length together with a protected header naming the al
 and the key (its SHA-384 thumbprint, computed from the public key); changing any of them makes
 the signature invalid. It reads the keys and the issuer from nowhere else and keeps nothing.**
 
+**Given the same two keys, a `typ` and a preimage type, `BeamMCP.Signer.COSE.HashEnvelope`
+returns the same carrier, its payload the SHA-384 (or SHA-512) of the stream or digest given.
+Its ML-DSA-87 signature covers that digest together with a protected header naming the
+algorithm, the key, the `typ`, the hash algorithm (258, listed in `crit`) and the preimage type
+(259). Changing any of them makes the signature invalid. Memory is independent of the stream's
+length. Every option is judged before the stream is read. It is a non-claimed path.**
+
 ## Threat model
 
 The asset is the host's private key; the goal is that this package adds no way for it to be
@@ -40,6 +47,8 @@ read, kept or misused beyond the host's own call.
 | A signature over bytes other than those given, or a non-standard signature | yes | the bytes go to `:crypto.sign/4` unaltered, with the algorithm and `:none` as literals and no options argument (census); tests verify with `:crypto.verify/5` and with core's `encode!/2` bytes |
 | ML-DSA-87: a signature that does not verify under the key the host publishes (a seed and public key that are not a pair, a faulted signature) | yes | every signature is verified under the given public key, and must not verify over bytes one bit away, before it is returned; otherwise a named error and no signature |
 | The algorithm or the key named beside a signature swapped (scheme and key id are host-asserted, outside the signed bytes) | yes, for `BeamMCP.Signer.COSE` | alg and kid are in the COSE protected header, inside ToBeSigned; tests, and Go and Rust verifiers in CI, show the signature fails once either is changed. The two raw-signature modules do not address it, by their shape |
+| A digest taken for the content, or signed under an unnamed hash (a raw signature over a digest) | yes, for the hash envelope | 258 and 259 are in the protected header, and 258 is in `crit`, so a COSE verifier that does not know RFC 9995 refuses rather than misreads (coset does, in CI); label 3 is never written |
+| A large artifact exhausting memory, or hashed and then refused | yes, for the hash envelope | `:crypto.hash_init/update/final` over the host's stream, one chunk at a time (a 10 GiB test holds VM growth under 64 MiB); every option is judged before the first chunk; the seed function is called only after the last |
 | COSE output a verifier reads differently (non-deterministic CBOR, an extra header label, a tagged or attached Sign1) | yes | the encoder writes RFC 8949 §4.2.1 under N6's rules and refuses everything else by name, held to RFC 8949 Appendix A and RFC 9964 A.2 byte for byte; the header is exactly `{1, 4, 16}`; two non-Elixir libraries (fxamacker/cbor, coset) re-read it in CI |
 | Weak randomness | yes | Ed25519 uses none (deterministic, RFC 8032). ML-DSA-87 is hedged: OpenSSL's DRBG supplies the per-signature `rnd`; were it constant, signing would be FIPS 204's deterministic variant, which is also approved. No key is generated here |
 | The host's key storage, the node the host runs, OpenSSL defects | no | the host's and upstream's; stated in `SECURITY.md` |
@@ -60,7 +69,7 @@ read, kept or misused beyond the host's own call.
 
 | principle | here |
 |---|---|
-| Economy of mechanism | three modules, one public function each, and a private encoder; remote calls `:crypto.sign/4`, `:crypto.verify/5` for ML-DSA-87's check, and `:crypto.hash/2` (SHA-384) in COSE, pinned by census |
+| Economy of mechanism | three modules, one public function each; the hash envelope, two; a private encoder and key helpers; remote calls `:crypto.sign/4`, `:crypto.verify/5` for ML-DSA-87's check, `:crypto.hash/2` (SHA-384) in COSE, and the streaming hash calls in the hash envelope, pinned by census |
 | Fail-safe defaults | no default key; a missing or malformed key is an error, never a signature |
 | Complete mediation | the key is checked on every call; nothing is cached |
 | Open design | standard Ed25519 and ML-DSA-87, verifiable by any implementation; the source is Apache-2.0 |

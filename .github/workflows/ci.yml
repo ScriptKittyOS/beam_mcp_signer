@@ -63,9 +63,15 @@ jobs:
       - run: mix credo --strict
       - run: mix hex.audit
       - run: mix test
-      # The box leg's ML-DSA-87 signature and N6 carrier, for the cross-verify job to check with
-      # implementations outside Elixir (tools/mldsa_sample.exs; the key pair is a published ACVP
-      # test vector).
+      # The hash envelope's done-when: a 10 GiB file (sparse, so no disk is written) signed in
+      # constant memory and verified holding only the digest and the signature, its digest held
+      # to sha384sum's (test/beam_mcp/signer/cose_hash_envelope_ten_gb_test.exs).
+      - name: a 10 GiB file signed in constant memory (hash envelope)
+        if: matrix.leg == 'box'
+        run: mix test --only ten_gb
+      # The box leg's ML-DSA-87 signature, N6 carrier and hash envelope, for the cross-verify job
+      # to check with implementations outside Elixir (tools/mldsa_sample.exs; the key pair is a
+      # published ACVP test vector).
       - name: an ML-DSA-87 signature for other implementations to verify
         if: matrix.leg == 'box'
         run: mix run tools/mldsa_sample.exs mldsa87-sample
@@ -85,7 +91,8 @@ jobs:
   # BeamMCP.Signer.MLDSA87's output, verified by two ML-DSA implementations other than the
   # OpenSSL that made it: Go's crypto/mldsa (which also derives the public key from the seed,
   # as OTP cannot) and AWS-LC through aws-lc-rs. Each must accept the signature and refuse it
-  # over the message with one bit flipped (tools/cross_verify/).
+  # over the message with one bit flipped; then read the N6 carrier and the hash envelope with
+  # its own CBOR and COSE code, build ToBeSigned itself and verify (tools/cross_verify/).
   cross-verify:
     name: ML-DSA-87 cross-verify (Go crypto/mldsa, aws-lc-rs)
     needs: test
@@ -101,10 +108,10 @@ jobs:
         with:
           go-version: "1.27.3"
           cache: false
-      - name: Go crypto/mldsa, and the N6 carrier read with fxamacker/cbor
+      - name: Go crypto/mldsa, and the N6 carrier and hash envelope read with fxamacker/cbor
         working-directory: tools/cross_verify/go
         run: go run . "$GITHUB_WORKSPACE/mldsa87-sample"
-      - name: aws-lc-rs, and the N6 carrier read with coset and ciborium (the toolchain and every crate pinned)
+      - name: aws-lc-rs, and the N6 carrier and hash envelope read with coset and ciborium (the toolchain and every crate pinned)
         working-directory: tools/cross_verify/rust
         run: |
           rustup toolchain install 1.92.0 --profile minimal

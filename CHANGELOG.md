@@ -7,6 +7,35 @@ SPDX-License-Identifier: Apache-2.0
 
 ## [Unreleased]
 
+### Added: `BeamMCP.Signer.COSE.HashEnvelope`, large artifacts signed by their digest (non-claimed)
+
+- A new public module, outside core's `BeamMCP.Signer` behaviour, which is unchanged; `COSE`
+  still exports only `sign/2`. `sign_stream/2` hashes any enumerable of binaries with
+  `:crypto.hash_init/update/final`, so memory is one chunk whatever the size.
+  `sign_digest/2` takes a digest the host already has.
+- **Output:** the N6 single-signer carrier, with the digest as its payload, signed as an RFC 9995
+  COSE Hash Envelope under ML-DSA-87. The protected header is `{1: -50, 2: [258], 4: kid,
+  16: typ, 258: -43 | -44, 259: preimage type, ? 260: location}`; label 3 is never written.
+- **Why:** a raw signature over a digest leaves the hash algorithm unsigned and the digest
+  indistinguishable from content. Here both are in the signed bytes, and `crit` makes a verifier
+  that does not know hash envelopes refuse.
+- **Options:** the two keys, read as `MLDSA87` reads them (the seed function is called after
+  the last chunk); `:typ` and `:preimage_type` (required); `:location` (optional);
+  `:payload_hash` (`:sha384`, the default, or `:sha512`). Every option is judged before the
+  first chunk is read. New errors: `:no_typ`, `{:typ, :invalid | :full_payload}`,
+  `:no_preimage_type`, `{:preimage_type, :invalid}`, `{:location, :invalid}`,
+  `{:payload_hash, :invalid}`, `{:digest, :wrong_length}`, `{:stream, :not_binary |
+  :unreadable}`.
+- **Non-claimed:** the signature is pure ML-DSA-87, not HashML-DSA, but no NSA, NIST or IETF text
+  yet names the construction, so it is not a claimed path.
+- **Tests:** a 10 GiB file (sparse), signed on CI's box leg (`mix test --only ten_gb`), with the
+  VM's memory growth held under 64 MiB and the digest held to `sha384sum`'s; a test-side
+  verifier that holds only the envelope and the public key. CI's Go and Rust cross-verify jobs
+  read the box leg's envelope. coset 0.4.2 refuses it over `crit` [258] (it predates RFC 9995),
+  and the Rust check asserts that refusal, then verifies with coset's ToBeSigned.
+- `BeamMCP.Signer.COSE`: the option walk, the key read and the kid moved to a private
+  `BeamMCP.Signer.COSE.Keys`, shared with the hash envelope; its answers do not change.
+
 ### Added: `BeamMCP.Signer.COSE`, ML-DSA-87 in COSE with the algorithm and key signed
 
 - A third module implementing core's `BeamMCP.Signer` behaviour, unchanged. It returns
