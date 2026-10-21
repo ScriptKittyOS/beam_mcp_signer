@@ -36,6 +36,20 @@ defmodule BeamMCP.Signer.COSE.HashEnvelopeTenGBTest do
     %{path: path}
   end
 
+  # The OS's view, with no sampling gap: Linux resets the process's peak resident set (VmHWM) to
+  # its current one on "5" written to clear_refs (proc(5)), so VmHWM after the stream is the
+  # peak during it. Where that is unavailable the line says so and only the sampled bound holds.
+  defp reset_peak_rss, do: File.write("/proc/self/clear_refs", "5") == :ok
+
+  defp status_kb(field) do
+    with {:ok, status} <- File.read("/proc/self/status"),
+         [_, kb] <- Regex.run(~r/^#{field}:\s+(\d+) kB$/m, status) do
+      String.to_integer(kb) * 1024
+    else
+      _ -> nil
+    end
+  end
+
   # The VM's total memory, sampled every 50 ms until told to stop: the peak comes back.
   defp sample(peak) do
     receive do
@@ -50,6 +64,8 @@ defmodule BeamMCP.Signer.COSE.HashEnvelopeTenGBTest do
   } do
     assert File.stat!(path).size == @size
     :erlang.garbage_collect()
+    rss_measured? = reset_peak_rss()
+    rss_start = status_kb("VmRSS")
     start = :erlang.memory(:total)
     sampler = spawn_link(fn -> sample(start) end)
 
@@ -68,6 +84,7 @@ defmodule BeamMCP.Signer.COSE.HashEnvelopeTenGBTest do
     assert {:ok, carrier} = result
 
     growth = peak - start
+    rss_peak = if rss_measured?, do: status_kb("VmHWM")
 
     IO.puts(
       "\n10 GiB: #{div(micros, 1000)} ms; VM memory at start #{start} B, peak #{peak} B, " <>
@@ -75,6 +92,16 @@ defmodule BeamMCP.Signer.COSE.HashEnvelopeTenGBTest do
     )
 
     assert growth < @growth_limit
+
+    if rss_peak && rss_start do
+      IO.puts(
+        "RSS (VmHWM, no sampling gap): start #{rss_start} B, peak #{rss_peak} B, growth #{rss_peak - rss_start} B"
+      )
+
+      assert rss_peak - rss_start < @growth_limit
+    else
+      IO.puts("RSS: NOT MEASURED (no /proc/self/clear_refs here); the sampled bound alone holds")
+    end
 
     # The verifier holds the carrier and the public key, never the file.
     assert {:ok, %{digest: digest, payload_hash: -43}} =

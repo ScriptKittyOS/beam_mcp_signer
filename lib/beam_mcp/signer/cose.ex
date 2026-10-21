@@ -5,7 +5,7 @@ defmodule BeamMCP.Signer.COSE do
   @moduledoc """
   The canonical bytes signed as a statement whose signed bytes name the algorithm and the key:
   ML-DSA-87 in COSE (RFC 9964, algorithm -50), in the form Script Kitty's systems share for
-  everything they sign (the N6 profile, v0, provisional). The same seam as
+  everything they sign (the N6 profile, v0.1, a draft, provisional). The same seam as
   `BeamMCP.Signer.MLDSA87`, the same two keys, and one more option.
 
       Canonical.signature(graph, BeamMCP.Signer.COSE,
@@ -41,7 +41,7 @@ defmodule BeamMCP.Signer.COSE do
 
   **Options read:** `:private_key` and `:public_key`, as `BeamMCP.Signer.MLDSA87` reads them
   (each the bytes or a zero-arity function; each function called once per signature), and
-  `:issuer`, the statement's issuer, required: UTF-8 text in NFC, or `{:bytes, binary}`.
+  `:issuer`, the statement's issuer, required: text under N6's text rule (Unicode 15.0.0, no format or bidirectional controls, the NFC quick check YES, at most 65,536 bytes), or `{:bytes, binary}` of at most 65,536 bytes.
   Nothing else: no environment variable, file, configuration or default.
   """
 
@@ -64,7 +64,7 @@ defmodule BeamMCP.Signer.COSE do
   gives, and
 
     * `:no_issuer` -- the option is absent;
-    * `{:issuer, :invalid}` -- present, and neither UTF-8 text in NFC nor `{:bytes, binary}`.
+    * `{:issuer, :invalid}` -- present, and neither of those.
 
   Answers, not raises, as `BeamMCP.Signer.MLDSA87` answers; no answer carries a key byte.
   """
@@ -74,10 +74,11 @@ defmodule BeamMCP.Signer.COSE do
     with {:ok, seed} <- Keys.fetch(opts, :private_key, :no_private_key),
          {:ok, public} <- Keys.fetch(opts, :public_key, :no_public_key),
          {:ok, issuer} <- Keys.fetch(opts, :issuer, :no_issuer),
-         {:ok, seed} <- Keys.read(seed, :private_key),
-         {:ok, public} <- Keys.read(public, :public_key),
          {:ok, body} <- body(canonical_bytes, issuer),
-         {:ok, protected} <- header(Keys.kid(public)),
+         {:ok, public} <- Keys.read(public, :public_key),
+         {:ok, seed} <- Keys.read(seed, :private_key),
+         {:ok, kid} <- Keys.kid(public),
+         {:ok, protected} <- header(kid),
          {:ok, to_be_signed} <-
            CBOR.encode(["Signature1", {:bytes, protected}, {:bytes, ""}, {:bytes, body}]),
          {:ok, signature} <-
@@ -92,13 +93,15 @@ defmodule BeamMCP.Signer.COSE do
 
   def sign(_canonical_bytes, _opts), do: {:error, :bad_arguments}
 
+  # The issuer first, so a key function is never called for a call that is refused anyway.
   defp body(canonical_bytes, issuer) do
-    with {:ok, issuer} <- issuer(issuer) do
+    with {:ok, issuer} <- issuer(issuer),
+         {:ok, digest} <- sha384(canonical_bytes) do
       CBOR.encode(%{
         0 => @schema,
         1 => issuer,
         2 => %{
-          0 => [@sha384, {:bytes, :crypto.hash(:sha384, canonical_bytes)}],
+          0 => [@sha384, {:bytes, digest}],
           1 => byte_size(canonical_bytes),
           2 => @media_type
         }
@@ -106,7 +109,16 @@ defmodule BeamMCP.Signer.COSE do
     end
   end
 
-  defp issuer({:bytes, b} = issuer) when is_binary(b), do: {:ok, issuer}
+  defp sha384(bytes) do
+    {:ok, :crypto.hash(:sha384, bytes)}
+  catch
+    _kind, _reason -> {:error, :crypto_refused}
+  end
+
+  # N6's text limit (E9) for a text issuer comes with the encoder; a byte-string issuer is held to
+  # the same 65,536 bytes, so a carrier stays far below the 1,048,576 bytes a decoder admits.
+  defp issuer({:bytes, b} = issuer) when is_binary(b) and byte_size(b) <= 65_536,
+    do: {:ok, issuer}
 
   defp issuer(t) when is_binary(t) do
     case CBOR.encode(t) do

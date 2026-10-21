@@ -102,10 +102,11 @@ the GitHub Advisory Database and OSV, which `mix hex.audit` reads.
 
 | version | supported |
 |---|---|
-| `0.2.x` | yes |
+| `0.3.x` | yes |
+| `0.2.x` | no: fixes land on the latest release, and `0.3.0` changes no `0.2` answer, so moving is the requirement alone |
 | `0.1.x` | no, superseded (the key could reach an exception report; see the 0.2.0 CHANGELOG entry) |
 
-Within `0.2.x`, take `0.2.1` or later: `0.2.0` could print the key from options that are an
+A host still on `0.2.x` should be on `0.2.1`: `0.2.0` could print the key from options that are an
 improper list, from an entry `{:private_key, key, extra}`, or from a key function that raised
 (the 0.2.1 CHANGELOG entry).
 

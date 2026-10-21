@@ -14,5 +14,7 @@ end
 # The 10 GiB test (cose_hash_envelope_ten_gb_test.exs) runs only when asked for: `--only ten_gb`.
 ExUnit.start(exclude: [:ten_gb | if(mldsa87?, do: [:no_mldsa87], else: [:mldsa87])])
 
+Code.require_file("support/ucd.exs", __DIR__)
+BeamMCP.Signer.Test.UCD.load()
 Code.require_file("support/strict_cbor.exs", __DIR__)
 Code.require_file("support/hash_envelope_verifier.exs", __DIR__)

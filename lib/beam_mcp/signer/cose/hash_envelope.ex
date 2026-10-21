@@ -51,7 +51,9 @@ defmodule BeamMCP.Signer.COSE.HashEnvelope do
 
     * `:private_key`, `:public_key`: as `BeamMCP.Signer.MLDSA87` reads them. The public key is
       read first, before any chunk, since the kid needs it. A private key function is called
-      once, after the last chunk, so the seed is not held through the stream.
+      once, after the last chunk. So a function that fetches the seed from the host's store when
+      it is called keeps the seed out of the process while the stream is read; one that captures
+      the seed in its closure holds it all along, as any closure does.
     * `:typ`: required, as above.
     * `:preimage_type`: required. A media type (`type/subtype`, lowercase, no parameters, at
       most 255 bytes), or a CoAP content-format number in 0..65535.
@@ -99,6 +101,10 @@ defmodule BeamMCP.Signer.COSE.HashEnvelope do
   Signs an artifact by `digest`, its SHA-384 (48 bytes) or, with `payload_hash: :sha512`, its
   SHA-512 (64 bytes), computed by the host.
 
+  The module cannot know that the bytes are a digest of anything: only their length is checked.
+  So the carrier says that the key holder asserts this digest for an artifact of this type. Where
+  the artifact is to hand, `sign_stream/2` computes the digest itself.
+
   Returns `{:ok, carrier}` or `{:error, reason}`. The reasons are every one
   `BeamMCP.Signer.MLDSA87.sign/2` gives, and:
 
@@ -135,7 +141,7 @@ defmodule BeamMCP.Signer.COSE.HashEnvelope do
   """
   @spec sign_stream(Enumerable.t(), keyword()) :: {:ok, binary()} | {:error, reason()}
   def sign_stream(chunks, opts) when is_list(opts) do
-    if Enumerable.impl_for(chunks) do
+    if enumerable?(chunks) do
       with {:ok, signer} <- prepare(opts),
            :ok <- offered(),
            {:ok, digest} <- hash(chunks, signer.hash) do
@@ -148,6 +154,11 @@ defmodule BeamMCP.Signer.COSE.HashEnvelope do
 
   def sign_stream(_chunks, _opts), do: {:error, :bad_arguments}
 
+  # A function is enumerable only at arity 2 (Elixir's own reducer form); any other is refused
+  # here rather than raised on and answered as an unreadable stream.
+  defp enumerable?(f) when is_function(f), do: is_function(f, 2)
+  defp enumerable?(other), do: Enumerable.impl_for(other) != nil
+
   # Every option, the public key and, unless it is a function, the private key, judged before any
   # hashing. Each entry point then asks whether ML-DSA-87 is offered at all, so a runtime without
   # it refuses before the stream rather than after.
@@ -159,19 +170,21 @@ defmodule BeamMCP.Signer.COSE.HashEnvelope do
          {:ok, location} <- Keys.fetch(opts, :location, {:default, nil}),
          {:ok, hash} <- Keys.fetch(opts, :payload_hash, {:default, :sha384}),
          {:ok, public} <- Keys.read(public, :public_key),
-         :ok <- size(public, 2592, {:public_key, :not_2592_bytes}),
          :ok <- seed_size(seed),
          {:ok, {alg, length}} <- payload_hash(hash),
-         {:ok, protected} <- protected(public, typ, preimage_type, location, alg) do
+         {:ok, kid} <- Keys.kid(public),
+         {:ok, protected} <- protected(kid, typ, preimage_type, location, alg) do
       {:ok, %{seed: seed, public: public, protected: protected, hash: hash, length: length}}
     end
   end
 
-  defp size(bytes, size, _reason) when is_binary(bytes) and byte_size(bytes) == size, do: :ok
-  defp size(_bytes, _size, reason), do: {:error, reason}
-
+  # A seed handed in as bytes (or as anything but a function) is judged now; a function's result
+  # is judged when it is called, after the stream.
   defp seed_size(seed) when is_function(seed, 0), do: :ok
-  defp seed_size(seed), do: size(seed, 32, {:private_key, :not_32_bytes})
+
+  defp seed_size(seed) do
+    with {:ok, _seed} <- Keys.read(seed, :private_key), do: :ok
+  end
 
   defp payload_hash(hash) when is_map_key(@hashes, hash), do: {:ok, Map.fetch!(@hashes, hash)}
   defp payload_hash(_hash), do: {:error, {:payload_hash, :invalid}}
@@ -179,19 +192,19 @@ defmodule BeamMCP.Signer.COSE.HashEnvelope do
   defp digest_length(digest, length) when byte_size(digest) == length, do: :ok
   defp digest_length(_digest, _length), do: {:error, {:digest, :wrong_length}}
 
-  defp protected(public, typ, preimage_type, location, alg) do
+  defp protected(kid, typ, preimage_type, location, alg) do
     with {:ok, typ} <- typ(typ),
          {:ok, preimage_type} <- preimage_type(preimage_type),
-         {:ok, header} <- location(location, base(public, typ, preimage_type, alg)) do
+         {:ok, header} <- location(location, base(kid, typ, preimage_type, alg)) do
       CBOR.encode(header)
     end
   end
 
-  defp base(public, typ, preimage_type, alg) do
+  defp base(kid, typ, preimage_type, alg) do
     %{
       1 => @alg,
       2 => @crit,
-      4 => {:bytes, Keys.kid(public)},
+      4 => {:bytes, kid},
       16 => typ,
       @payload_hash_alg => alg,
       @preimage_content_type => preimage_type

@@ -4,7 +4,7 @@
 defmodule BeamMCP.Signer.Ed25519.MixProject do
   use Mix.Project
 
-  @version "0.2.1"
+  @version "0.3.0"
   @source_url "https://github.com/ScriptKittyOS/beam_mcp_signer"
 
   # The same floor as beam_mcp: the behaviour this package implements lives there, and one
@@ -64,11 +64,14 @@ defmodule BeamMCP.Signer.Ed25519.MixProject do
   defp package do
     [
       name: "beam_mcp_signer",
-      licenses: ["Apache-2.0"],
+      licenses: ["Apache-2.0", "Unicode-3.0"],
       links: %{"GitHub" => @source_url, "beam_mcp" => "https://github.com/ScriptKittyOS/beam_mcp"},
       # Globs, not a directory: a directory in `files:` is walked in readdir order, which differs
       # between filesystems, so the tarball would be the machine's (tools/release_tarball.sh).
-      files: ~w(lib/**/*.ex mix.exs README.md CHANGELOG.md LICENSE NOTICE)
+      # LICENSES/Unicode-3.0.txt travels with lib/beam_mcp/signer/cose/unicode.ex, whose tables are
+      # Unicode's data: the Unicode License v3 asks for its notice with every copy.
+      files:
+        ~w(lib/**/*.ex mix.exs README.md CHANGELOG.md LICENSE NOTICE LICENSES/Unicode-3.0.txt)
     ]
   end
 
