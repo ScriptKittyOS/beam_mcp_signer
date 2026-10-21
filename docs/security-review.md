@@ -43,6 +43,9 @@ Each item is answered with what was read, what was tried, and what was found.
    For the hash envelope: is the header exactly `{1: -50, 2: [258], 4, 16, 258, 259}` plus an
    optional 260, never label 3? Is every option judged before a chunk is read, and the seed
    function called only after the last? Does the 10 GiB test's memory bound still hold?
+   For text: does `lib/beam_mcp/signer/cose/text.ex` apply profile v0.1 §2.4 exactly, against
+   `lib/beam_mcp/signer/cose/unicode.ex` as `tools/unicode_tables.sh` regenerates it from the
+   pinned data, with no normaliser called anywhere under `lib/`?
 5. **Randomness.** Ed25519 uses none; ML-DSA-87's comes from OpenSSL's DRBG. Confirm that no
    key or nonce is generated in `lib/`.
 6. **Supply chain and release.** `mix.lock` against `mix hex.audit`; the `beam_mcp` requirement;

@@ -109,10 +109,10 @@ in the COSE protected header, inside the signed bytes.
 ```
 
 The keys are `BeamMCP.Signer.MLDSA87`'s, read the same way, and that module makes and checks
-the signature. `:issuer` is required: UTF-8 text in NFC, or `{:bytes, binary}`.
+the signature. `:issuer` is required: text under N6's text rule (Unicode 15.0.0, no format or bidirectional controls, the NFC quick check YES, at most 65,536 bytes), or `{:bytes, binary}` of at most 65,536 bytes.
 
 What comes back is one binary, deterministic CBOR, in the form Script Kitty's systems share for
-everything they sign (the N6 profile, v0; provisional until its v1):
+everything they sign (the N6 profile, v0.1, a draft; provisional until its v1):
 
 ```
 {0: 0xFFFF0003,                                        ; the single-signer carrier
@@ -145,7 +145,16 @@ registry:
 (`coset`, `ciborium` and aws-lc-rs), and CI runs both on the box leg's carrier on every change.
 The schema number and `typ` are provisional and change when the shared registry assigns them.
 The encoder is this package's own: no Elixir library writes deterministic CBOR or COSE with
-ML-DSA. It is held to RFC 8949 Appendix A and to RFC 9964 Appendix A.2, byte for byte.
+ML-DSA. It is held to RFC 8949 Appendix A and to RFC 9964 Appendix A.2, byte for byte. Text
+follows the profile's text rule against Unicode 15.0.0 tables embedded in the package
+(`tools/unicode_tables.sh` fetches the data and pins it by sha256), never the runtime's own
+Unicode; the suite checks every code point against the data files with a parser of its own.
+
+**One key per scheme.** Keep a COSE key for `BeamMCP.Signer.COSE` and the hash envelope, and do
+not hand it to `BeamMCP.Signer.MLDSA87` for anything but core's canonical bytes.
+`MLDSA87.sign/2` signs any binary it is given, and a COSE ToBeSigned is a binary. Core's
+canonical bytes begin with `{`, and every ToBeSigned begins `84 6a "Signature1"`, so a raw
+signature over the connectome is never a COSE one. Other bytes could be.
 
 ## Hash envelope (non-claimed)
 
@@ -160,7 +169,8 @@ one chunk and a hash state:
     typ: "application/vnd.example.b80.test_hash.v0+cose", preimage_type: "video/mp4")
 ```
 
-`sign_digest/2` takes a digest the host already has. What comes back is the same carrier as
+`sign_digest/2` takes a digest the host already has. It checks only the length, so the carrier
+says that the key holder asserts that digest. What comes back is the same carrier as
 COSE's, with the digest as its payload:
 
 ```

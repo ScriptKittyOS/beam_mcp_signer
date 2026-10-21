@@ -12,5 +12,9 @@ Roles, stated separately because they are separate:
   Script Kitty LLC        built it.
   Ayla Croft              authored it. ORCID 0009-0008-9457-2160
 
+lib/beam_mcp/signer/cose/unicode.ex holds tables generated from the Unicode
+Character Database, version 15.0.0, Copyright 2022 Unicode, Inc., under the
+Unicode License v3 (LICENSES/Unicode-3.0.txt).
+
 Third-party dependencies retain their own licenses; see mix.lock and the
 individual package sources for details.

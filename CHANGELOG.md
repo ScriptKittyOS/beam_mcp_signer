@@ -7,6 +7,43 @@ SPDX-License-Identifier: Apache-2.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-21
+
+Three modules added, ML-DSA-87 among them; nothing an `0.2` host calls changes. `Ed25519` and
+core's `BeamMCP.Signer` behaviour are as they were, so moving is the requirement alone:
+`{:beam_mcp_signer, "~> 0.3"}`. Core requirement unchanged (`~> 0.7`). ML-DSA-87 needs an OTP
+whose `:crypto` is linked to OpenSSL 3.5 or later; elsewhere its modules answer
+`{:error, :crypto_refused}` and `Ed25519` is unaffected.
+
+- **Provisional formats.** `BeamMCP.Signer.COSE` and `BeamMCP.Signer.COSE.HashEnvelope` write the
+  shared N6 profile (v0.1, a draft). Its schema numbers and `typ` values are provisional, and a
+  change to them comes in a new version of this package.
+- **Non-claimed.** The hash envelope is not a claimed path under CNSA 2.0 (see its entry).
+- **Pre-release review.** Two independent lanes read every module added since 0.2.1, one on key
+  handling and error surfaces, one on encoding and cryptographic correctness. They are recorded
+  here; they are not a review under `docs/security-review.md`, which a person does. Fixed in this
+  release:
+  - A key function that returned a function was resolved twice. COSE then computed the kid from
+    the placeholder and returned a carrier with a 48-byte zero kid. Every key read now requires
+    the key's bytes at their size (`{:public_key, :not_2592_bytes}`), so the kid is always the
+    signing key's thumbprint.
+  - Text followed the runtime's NFC normaliser, not N6's text rule. The rule is now Unicode
+    15.0.0 tables embedded in the package, from `tools/unicode_tables.sh`. Format and
+    bidirectional controls, unassigned code points and NFC quick-check MAYBE are refused, and no
+    normaliser is called. An issuer such as `"a\u202Eb"` was signed and is now
+    `{:issuer, :invalid}`. Text is at most 65,536 bytes, and so is a byte-string issuer.
+  - The issuer is judged before either key function is called. A `:crypto` refusal while
+    hashing the kid or the canonical bytes is answered `:crypto_refused`, not raised with the
+    public key in the frame.
+  - An improper list given to the encoder is refused, not raised on.
+  - `sign_stream/2` refuses a function that is not an enumerable (`:bad_arguments`).
+  - Documented: `sign_digest/2` cannot know its 48 bytes are a digest; one key per scheme;
+    "the seed is not held through the stream" holds only for a key function that fetches the
+    seed when it is called.
+  - Tests: the census bars the process dictionary, ports and `binary_to_term` in every module.
+    The 10 GiB test also bounds the VM's peak RSS (VmHWM, reset before the stream), with no
+    sampling gap.
+
 ### Added: `BeamMCP.Signer.COSE.HashEnvelope`, large artifacts signed by their digest (non-claimed)
 
 - A new public module, outside core's `BeamMCP.Signer` behaviour, which is unchanged; `COSE`
@@ -46,11 +83,12 @@ SPDX-License-Identifier: Apache-2.0
 - **Why:** `Canonical.signature/3` places `scheme:` and `key_id:` beside a raw signature,
   unsigned; swapping either leaves the signature valid. Here both are inside the signed bytes.
 - **Options:** `BeamMCP.Signer.MLDSA87`'s two keys, read the same way, and `:issuer`
-  (required; NFC text or `{:bytes, binary}`). New errors: `:no_issuer`, `{:issuer, :invalid}`;
+  (required; text under N6's text rule or `{:bytes, binary}`, each at most 65,536 bytes). New
+  errors: `:no_issuer`, `{:issuer, :invalid}`;
   every other answer is `MLDSA87`'s, which makes and checks the signature.
 - **Provisional:** the statement's schema number (0x85000101) and `typ`
   (`application/vnd.example.b85.connectome.v0+cose`) are provisional, as is the N6 profile
-  (v0); they change when the shared registry assigns them.
+  (v0.1, a draft); they change when the shared registry assigns them.
 - **Encoder:** the package's own (private), deterministic CBOR under N6's rules, refusing
   floats, tags, other simple values, non-integer keys and non-NFC text by name. Held to RFC 8949
   Appendix A and RFC 9964 Appendix A.2 byte for byte (`tools/vectors_cose.sh` writes the A.2

@@ -303,6 +303,7 @@ defmodule BeamMCP.Signer.COSE.HashEnvelopeTest do
       assert HashEnvelope.sign_stream(raising, opts()) == {:error, {:stream, :unreadable}}
 
       assert HashEnvelope.sign_stream("not a stream", opts()) == {:error, :bad_arguments}
+      assert HashEnvelope.sign_stream(fn -> "x" end, opts()) == {:error, :bad_arguments}
       assert HashEnvelope.sign_stream([], %{}) == {:error, :bad_arguments}
     end
 
@@ -339,6 +340,9 @@ defmodule BeamMCP.Signer.COSE.HashEnvelopeTest do
     @tag :mldsa87
     test "a private key function that raises or returns the wrong size" do
       digest = :crypto.hash(:sha384, "a")
+
+      assert HashEnvelope.sign_digest(digest, opts(private_key: fn -> fn -> @seed end end)) ==
+               {:error, {:private_key, :not_32_bytes}}
 
       assert HashEnvelope.sign_digest(digest, opts(private_key: fn -> raise "x" end)) ==
                {:error, {:private_key, :unreadable}}

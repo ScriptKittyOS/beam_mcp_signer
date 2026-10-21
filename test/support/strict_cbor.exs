@@ -6,11 +6,14 @@ defmodule BeamMCP.Signer.Test.StrictCBOR do
   # A strict decoder for N6's encoding rules (E1-E8, E10), for the tests only. It judges
   # canonical form as it reads -- every head the shortest for its argument, every length
   # definite, every map's keys unsigned and in ascending order of their encoded bytes, every
-  # text valid UTF-8 in NFC -- rather than by re-encoding with the encoder under test, so a
+  # text under the profile's text rule (test/support/ucd.exs, from the Unicode data files) --
+  # rather than by re-encoding with the encoder under test, so a
   # defect in that encoder cannot pass as canonical here. Values come back in the encoder's
   # own form: integers, `{:bytes, b}`, text as a binary, lists, maps, true, false, nil.
 
   import Bitwise
+
+  alias BeamMCP.Signer.Test.UCD
 
   def decode(bytes) when is_binary(bytes) do
     case item(bytes) do
@@ -46,13 +49,9 @@ defmodule BeamMCP.Signer.Test.StrictCBOR do
   end
 
   defp value(3, n, rest) do
-    with {:ok, t, rest} <- take(rest, n) do
-      cond do
-        not String.valid?(t) -> {:error, :invalid_utf8}
-        :unicode.characters_to_nfc_binary(t) != t -> {:error, :not_nfc}
-        true -> {:ok, t, rest}
-      end
-    end
+    with {:ok, t, rest} <- take(rest, n),
+         :ok <- text(t),
+         do: {:ok, t, rest}
   end
 
   defp value(4, n, rest), do: array(n, rest, [])
@@ -63,6 +62,14 @@ defmodule BeamMCP.Signer.Test.StrictCBOR do
   defp value(7, 21, rest), do: {:ok, true, rest}
   defp value(7, 22, rest), do: {:ok, nil, rest}
   defp value(7, _n, _rest), do: {:error, :float_or_simple_forbidden}
+
+  defp text(t) do
+    cond do
+      not String.valid?(t) -> {:error, :invalid_utf8}
+      byte_size(t) > 65_536 -> {:error, :text_too_long}
+      true -> UCD.check(t)
+    end
+  end
 
   defp take(rest, n) when byte_size(rest) >= n,
     do: {:ok, binary_part(rest, 0, n), binary_part(rest, n, byte_size(rest) - n)}

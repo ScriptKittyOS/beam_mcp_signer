@@ -19,21 +19,37 @@ defmodule BeamMCP.Signer.COSE.Keys do
   def fetch([], _name, missing), do: {:error, missing}
   def fetch(_improper_tail, _name, _missing), do: {:error, :bad_arguments}
 
-  # A reference is called once, here, and the bytes go on to MLDSA87, which checks their sizes
-  # and reads them as it reads bytes a host passes; what a function raises, throws or exits is
-  # answered as unreadable, the reason dropped unread.
-  def read(key, name) when is_function(key, 0) do
-    {:ok, key.()}
-  catch
-    _kind, _reason -> {:error, {name, :unreadable}}
+  # A reference is called once, here, and what it returns must be the key's bytes at their size,
+  # MLDSA87's answers for anything else: a function that returns a function is refused here, not
+  # resolved a second time downstream, so the kid is never computed from anything but the bytes
+  # that are signed with. What a function raises, throws or exits is answered as unreadable, the
+  # reason dropped unread.
+  def read(key, name) do
+    {size, wrong_size} = size(name)
+
+    case resolve(key) do
+      {:ok, bytes} when is_binary(bytes) and byte_size(bytes) == size -> {:ok, bytes}
+      {:ok, _other} -> {:error, {name, wrong_size}}
+      :unreadable -> {:error, {name, :unreadable}}
+    end
   end
 
-  def read(key, _name), do: {:ok, key}
+  defp size(:private_key), do: {32, :not_32_bytes}
+  defp size(:public_key), do: {2592, :not_2592_bytes}
 
-  # The thumbprint needs exactly the 2,592-byte key; any other size is MLDSA87's answer to give,
-  # so a key of the wrong size gets a placeholder kid here and is refused there, before signing.
-  def kid(public) when is_binary(public) and byte_size(public) == 2592,
-    do: :crypto.hash(:sha384, @thumbprint_prefix <> public)
+  defp resolve(key) when is_function(key, 0) do
+    {:ok, key.()}
+  catch
+    _kind, _reason -> :unreadable
+  end
 
-  def kid(_public), do: <<0::384>>
+  defp resolve(key), do: {:ok, key}
+
+  # Over the 2,592 bytes `read/2` gave back. `:crypto` raising here (a runtime without it, a
+  # provider refusing SHA-384) would print the public key in its frame: answered, dropped unread.
+  def kid(public) when is_binary(public) and byte_size(public) == 2592 do
+    {:ok, :crypto.hash(:sha384, @thumbprint_prefix <> public)}
+  catch
+    _kind, _reason -> {:error, :crypto_refused}
+  end
 end

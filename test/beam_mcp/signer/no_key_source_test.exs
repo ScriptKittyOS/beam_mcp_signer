@@ -8,7 +8,7 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
   use ExUnit.Case, async: true
 
   alias BeamMCP.Signer.{COSE, Ed25519, MLDSA87}
-  alias BeamMCP.Signer.COSE.{CBOR, HashEnvelope, Keys}
+  alias BeamMCP.Signer.COSE.{CBOR, HashEnvelope, Keys, Text, Unicode}
 
   @lib Path.wildcard(Path.expand("../../../lib/**/*.ex", __DIR__))
   @source %{
@@ -17,7 +17,9 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
     COSE => "cose.ex",
     CBOR => "cbor.ex",
     Keys => "keys.ex",
-    HashEnvelope => "hash_envelope.ex"
+    HashEnvelope => "hash_envelope.ex",
+    Text => "text.ex",
+    Unicode => "unicode.ex"
   }
 
   @key_source ~r/System\.(get_env|fetch_env!?|cmd)|:os\.(getenv|cmd)|Application\.(get_env|fetch_env!?|get_all_env)|File\.|Path\.expand|~\/|\.ssh|HEX_API_KEY|_KEY"|:persistent_term|:ets\.|Process\.(get|put)|Code\.eval|:init\.get_argument/
@@ -49,7 +51,7 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
   # ML-DSA is not HashML-DSA but pure ML-DSA over the digest.
   @crypto_args %{Ed25519 => {:eddsa, :none}, MLDSA87 => {:mldsa87, :none}}
 
-  test "the package is the three signer modules, the hash envelope, the encoder and the key helpers, and no line under lib/ names an environment, file, config or store read" do
+  test "the package is the three signer modules, the hash envelope, the encoder, the text rule and the key helpers, and no line under lib/ names an environment, file, config or store read" do
     assert @lib |> Enum.map(&Path.basename/1) |> Enum.sort() ==
              @source |> Map.values() |> Enum.sort()
 
@@ -168,18 +170,43 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
            end)
   end
 
-  test "BeamMCP.Signer.COSE.CBOR: pure encoding, no :crypto, no I/O" do
+  # The calls a beam-level census could miss in a module held to a reach rather than an exact
+  # list: the process dictionary, ports, node registration and decoding terms from bytes.
+  test "no module under lib/ keeps state in the process dictionary, opens a port or decodes a term" do
+    barred = [:put, :get, :erase, :open_port, :binary_to_term, :register, :spawn, :spawn_link]
+
+    for module <- [Ed25519, MLDSA87, COSE, CBOR, Keys, HashEnvelope, Text, Unicode] do
+      assert for({:erlang, f, _a} <- remote_calls(module), f in barred, do: f) == [],
+             inspect(module)
+    end
+  end
+
+  test "BeamMCP.Signer.COSE.CBOR: pure encoding, no :crypto, no I/O; text judged by the text rule" do
     calls = remote_calls(CBOR)
+    assert Enum.map(calls, &elem(&1, 0)) |> Enum.uniq() |> Enum.sort() == [Text, Enum, :erlang]
+    assert {Text, :check, 1} in calls
+  end
+
+  # Profile v0.1 §2.4: "No encoder or decoder calls a Unicode normalisation routine on input",
+  # and the tables are the pinned 15.0.0 ones, never the runtime's.
+  test "the text rule reads only its own Unicode 15.0.0 tables, and nothing under lib/ calls a normaliser" do
+    calls = remote_calls(Text)
 
     assert Enum.map(calls, &elem(&1, 0)) |> Enum.uniq() |> Enum.sort() == [
-             Enum,
+             Unicode,
              String,
-             :erlang,
-             :unicode
+             :erlang
            ]
 
-    assert {:unicode, :characters_to_nfc_binary, 1} in calls
     assert {String, :valid?, 1} in calls
+    assert Enum.reject(remote_calls(Unicode), &match?({:erlang, :get_module_info, _}, &1)) == []
+
+    for module <- [Ed25519, MLDSA87, COSE, CBOR, Keys, HashEnvelope, Text, Unicode],
+        {m, f, _a} <- remote_calls(module) do
+      refute m == :unicode or m == :unicode_util or
+               (m == String and f in [:normalize, :to_charlist]),
+             "#{inspect(module)} calls #{inspect(m)}.#{f}"
+    end
   end
 
   test "Ed25519: the private key is 32 bytes, given directly or by a zero-arity reference, and the seed length is a module constant" do

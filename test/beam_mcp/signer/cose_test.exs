@@ -248,6 +248,37 @@ defmodule BeamMCP.Signer.COSETest do
       assert COSE.sign("b", [{:issuer, "i"} | :improper]) == {:error, :bad_arguments}
     end
 
+    test "a key function that returns a function is refused, never signed under a placeholder kid" do
+      nested_public = fn -> fn -> @pub end end
+      nested_seed = fn -> fn -> @seed end end
+
+      assert COSE.sign("b", opts(public_key: nested_public)) ==
+               {:error, {:public_key, :not_2592_bytes}}
+
+      assert COSE.sign("b", opts(private_key: nested_seed)) ==
+               {:error, {:private_key, :not_32_bytes}}
+    end
+
+    test "the issuer is judged before either key function is called" do
+      me = self()
+
+      private = fn ->
+        send(me, :private)
+        @seed
+      end
+
+      public = fn ->
+        send(me, :public)
+        @pub
+      end
+
+      assert COSE.sign("b", private_key: private, public_key: public, issuer: 1) ==
+               {:error, {:issuer, :invalid}}
+
+      refute_received :private
+      refute_received :public
+    end
+
     @tag :mldsa87
     test "a public key that is not the seed's: no carrier" do
       {other, _} = :crypto.generate_key(:mldsa87, [])
