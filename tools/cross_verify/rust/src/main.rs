@@ -3,12 +3,14 @@
 
 //! Verifies an ML-DSA-87 signature made by BeamMCP.Signer.MLDSA87 (tools/mldsa_sample.exs) with
 //! aws-lc-rs (AWS-LC's ML-DSA, not OpenSSL's): the signature verifies over the message, and does
-//! not verify over the message with one bit flipped; and the N6 carrier BeamMCP.Signer.COSE made
-//! over the same message (carrier.rs).
+//! not verify over the message with one bit flipped; the N6 carrier BeamMCP.Signer.COSE made over
+//! the same message (carrier.rs); and the hash envelope BeamMCP.Signer.COSE.HashEnvelope made over
+//! it (hash_envelope.rs).
 //!
 //!     cargo run --locked --release -- <dir>
 
 mod carrier;
+mod hash_envelope;
 
 use aws_lc_rs::signature::{UnparsedPublicKey, ML_DSA_87};
 use std::{env, fs, path::Path, process};
@@ -46,4 +48,5 @@ fn main() {
     println!("ok   it does not verify over the message with one bit flipped");
 
     carrier::verify(&encoded, &message, &read(dir, "carrier.cbor"));
+    hash_envelope::verify(&encoded, &message, &read(dir, "hash-envelope.cbor"));
 }

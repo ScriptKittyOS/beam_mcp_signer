@@ -4,7 +4,8 @@
 // Verifies an ML-DSA-87 signature made by BeamMCP.Signer.MLDSA87 (tools/mldsa_sample.exs) with
 // Go's crypto/mldsa, an implementation independent of OpenSSL's: the signature verifies over
 // the message with an empty context, does not verify over the message with one bit flipped,
-// and the public key is the one the seed derives (which OTP's :crypto cannot compute).
+// and the public key is the one the seed derives (which OTP's :crypto cannot compute); then the
+// N6 carrier (carrier.go) and the hash envelope (hashenvelope.go) made over the same message.
 //
 //	go run . <dir>
 package main
@@ -64,4 +65,5 @@ func main() {
 	fmt.Println("ok   the public key is the one the seed derives")
 
 	verifyCarrier(pk, encoded, message, read(dir, "carrier.cbor"))
+	verifyHashEnvelope(pk, encoded, message, read(dir, "hash-envelope.cbor"))
 }

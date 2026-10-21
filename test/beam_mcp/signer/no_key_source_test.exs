@@ -8,14 +8,16 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
   use ExUnit.Case, async: true
 
   alias BeamMCP.Signer.{COSE, Ed25519, MLDSA87}
-  alias BeamMCP.Signer.COSE.CBOR
+  alias BeamMCP.Signer.COSE.{CBOR, HashEnvelope, Keys}
 
   @lib Path.wildcard(Path.expand("../../../lib/**/*.ex", __DIR__))
   @source %{
     Ed25519 => "ed25519.ex",
     MLDSA87 => "mldsa87.ex",
     COSE => "cose.ex",
-    CBOR => "cbor.ex"
+    CBOR => "cbor.ex",
+    Keys => "keys.ex",
+    HashEnvelope => "hash_envelope.ex"
   }
 
   @key_source ~r/System\.(get_env|fetch_env!?|cmd)|:os\.(getenv|cmd)|Application\.(get_env|fetch_env!?|get_all_env)|File\.|Path\.expand|~\/|\.ssh|HEX_API_KEY|_KEY"|:persistent_term|:ets\.|Process\.(get|put)|Code\.eval|:init\.get_argument/
@@ -47,7 +49,7 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
   # ML-DSA is not HashML-DSA but pure ML-DSA over the digest.
   @crypto_args %{Ed25519 => {:eddsa, :none}, MLDSA87 => {:mldsa87, :none}}
 
-  test "the package is the three signer modules and the encoder, and no line under lib/ names an environment, file, config or store read" do
+  test "the package is the three signer modules, the hash envelope, the encoder and the key helpers, and no line under lib/ names an environment, file, config or store read" do
     assert @lib |> Enum.map(&Path.basename/1) |> Enum.sort() ==
              @source |> Map.values() |> Enum.sort()
 
@@ -94,24 +96,76 @@ defmodule BeamMCP.Signer.NoKeySourceTest do
     end
   end
 
-  # The COSE module signs nothing itself: its one `:crypto` call is SHA-384 (the thumbprint and
-  # the digest of the canonical bytes), and the signature is MLDSA87's, checked there. Its
-  # encoder calls no `:crypto` and nothing outside the VM. Both lists are the beams' whole truth.
-  test "BeamMCP.Signer.COSE: SHA-384, the encoder and MLDSA87.sign/2, and no signing primitive of its own" do
+  # The COSE module signs nothing itself: its one `:crypto` call is SHA-384 (the digest of the
+  # canonical bytes), the kid is Keys' (SHA-384 too), and the signature is MLDSA87's, checked
+  # there. Its encoder calls no `:crypto` and nothing outside the VM. Both lists are the beams'
+  # whole truth.
+  test "BeamMCP.Signer.COSE: SHA-384, the encoder, the key helpers and MLDSA87.sign/2, and no signing primitive of its own" do
     assert remote_calls(COSE) == [
              {CBOR, :encode, 1},
+             {Keys, :fetch, 3},
+             {Keys, :kid, 1},
+             {Keys, :read, 2},
              {MLDSA87, :sign, 2},
              {:crypto, :hash, 2},
              {:erlang, :byte_size, 1},
              {:erlang, :get_module_info, 2},
              {:erlang, :is_binary, 1},
-             {:erlang, :is_function, 2},
              {:erlang, :is_list, 1}
            ]
 
-    for args <- collect_crypto_args(forms(COSE)) do
+    for module <- [COSE, Keys], args <- collect_crypto_args(forms(module)) do
       assert [{:atom, _, :sha384} | _] = args
     end
+
+    assert remote_calls(Keys) == [
+             {:crypto, :hash, 2},
+             {:erlang, :byte_size, 1},
+             {:erlang, :get_module_info, 2},
+             {:erlang, :is_binary, 1},
+             {:erlang, :is_function, 2}
+           ]
+  end
+
+  # The hash envelope signs nothing itself either: its `:crypto` calls hash the stream and ask
+  # whether ML-DSA-87 is offered, and the signature is MLDSA87's. Held to what it may reach rather
+  # than to an exact list, since the regex and map syntax compile to different helper calls
+  # across the Elixir lines CI runs.
+  test "BeamMCP.Signer.COSE.HashEnvelope: hashing, the encoder, the key helpers and MLDSA87.sign/2, no I/O" do
+    calls = remote_calls(HashEnvelope)
+
+    assert for({:crypto, f, a} <- calls, do: {f, a}) == [
+             hash_final: 1,
+             hash_init: 1,
+             hash_update: 2,
+             supports: 1
+           ]
+
+    assert {MLDSA87, :sign, 2} in calls
+    assert {CBOR, :encode, 1} in calls
+
+    assert for({BeamMCP.Signer.COSE.Keys, f, a} <- calls, do: {f, a}) == [
+             fetch: 3,
+             kid: 1,
+             read: 2
+           ]
+
+    refute Enum.any?(calls, fn {m, _, _} -> m in [Ed25519, COSE] end)
+
+    refute Enum.any?(calls, fn {m, _, _} ->
+             m in [
+               System,
+               File,
+               Application,
+               Path,
+               Process,
+               Code,
+               :os,
+               :file,
+               :ets,
+               :persistent_term
+             ]
+           end)
   end
 
   test "BeamMCP.Signer.COSE.CBOR: pure encoding, no :crypto, no I/O" do

@@ -9,7 +9,7 @@ SPDX-License-Identifier: Apache-2.0
 
 Signers for [`beam_mcp`](https://github.com/ScriptKittyOS/beam_mcp)'s canonical connectome
 bytes, through OTP's `:crypto`. Three modules, each implementing core's `BeamMCP.Signer`
-behaviour (`sign/2`) and nothing else:
+behaviour (`sign/2`) and nothing else, and a fourth for artifacts too large to hold whole:
 
 - **`BeamMCP.Signer.Ed25519`**: Ed25519 (RFC 8032), a 64-byte signature.
 - **`BeamMCP.Signer.MLDSA87`**: ML-DSA-87 (FIPS 204), the post-quantum signature CNSA 2.0
@@ -18,8 +18,11 @@ behaviour (`sign/2`) and nothing else:
 - **`BeamMCP.Signer.COSE`**: the same ML-DSA-87 signature inside COSE (RFC 9964, algorithm
   -50), with the algorithm and the key's thumbprint in the signed bytes; see [COSE](#cose)
   below.
+- **`BeamMCP.Signer.COSE.HashEnvelope`** (non-claimed): a file of any size, streamed and
+  signed by its SHA-384 as an RFC 9995 COSE Hash Envelope under the same ML-DSA-87. It is not
+  a `BeamMCP.Signer`; see [Hash envelope](#hash-envelope-non-claimed) below.
 
-**What they sign.** Exactly the bytes `BeamMCP.Connectome.Canonical.encode/2` produces, as
+**What the three sign.** Exactly the bytes `BeamMCP.Connectome.Canonical.encode/2` produces, as
 `Canonical.signature/3` hands them over; the signature comes back beside them. Nothing else:
 no envelope byte moves, no verdict or receipt is added.
 
@@ -144,11 +147,55 @@ The schema number and `typ` are provisional and change when the shared registry 
 The encoder is this package's own: no Elixir library writes deterministic CBOR or COSE with
 ML-DSA. It is held to RFC 8949 Appendix A and to RFC 9964 Appendix A.2, byte for byte.
 
+## Hash envelope (non-claimed)
+
+`BeamMCP.Signer.COSE.HashEnvelope` signs an artifact by its digest, so a 10 GB clip, tile
+bundle or model file never has to be in memory whole. The host streams it in, and memory stays
+one chunk and a hash state:
+
+```elixir
+{:ok, envelope} =
+  BeamMCP.Signer.COSE.HashEnvelope.sign_stream(chunks,   # say, a file read 1 MiB at a time
+    private_key: fn -> seed end, public_key: fn -> public_key end,
+    typ: "application/vnd.example.b80.test_hash.v0+cose", preimage_type: "video/mp4")
+```
+
+`sign_digest/2` takes a digest the host already has. What comes back is the same carrier as
+COSE's, with the digest as its payload:
+
+```
+{0: 0xFFFF0003, 1: h'<SHA-384 of the artifact>', 2: [h'<protected>', {}, null, h'<signature>']}
+
+protected = {1: -50, 2: [258], 4: h'<kid>', 16: "<typ>",
+             258: -43,                                 ; payload-hash-alg: SHA-384
+             259: "video/mp4",                         ; preimage-content-type
+             260: "<location>"}                        ; optional hint, never trusted
+```
+
+- **What it fixes.** A raw signature over a digest leaves the hash algorithm unsigned and the
+  digest indistinguishable from content. Here both the hash algorithm and the preimage's type
+  are in the protected header.
+- **How a verifier reads it.** `crit` lists 258, so a COSE verifier that does not know hash
+  envelopes refuses the signature. One that does needs only the envelope and the public key.
+  It rebuilds `["Signature1", protected, h'', digest]` and verifies. When it holds the
+  artifact, it also checks the digest.
+- **The `typ` is the host's** and required. It is a lowercase media type ending `+cose` that
+  names the kind of statement; the connectome's `typ` is refused. The preimage type is per
+  artifact. `payload_hash: :sha512` gives SHA-512 (-44).
+- **Non-claimed.** The signature is pure ML-DSA-87, not HashML-DSA, but no NSA, NIST or IETF
+  text yet names this construction. A verified envelope is judged non-claimed, and
+  `BeamMCP.Signer.COSE` stays the claimed path.
+- **Tested.** CI's box leg signs a 10 GiB file, holds the VM's memory growth under 64 MiB and
+  compares the digest with `sha384sum`'s. The Go and Rust verifiers read each run's envelope.
+  `coset` refuses it over `crit` (it predates RFC 9995), and the Rust check confirms that
+  refusal before verifying with coset's ToBeSigned.
+
 ## Any module
 
-This package reads the key options, and for COSE the issuer, and nothing else
-(`opts[:private_key]`, for ML-DSA-87 `opts[:public_key]`, for COSE `opts[:issuer]`) -- no
-environment variable, no file, no application config, no default.
+This package reads the key options, for COSE the issuer, and for the hash envelope its own
+options listed above, and nothing else (`opts[:private_key]`, for ML-DSA-87 `opts[:public_key]`,
+for COSE `opts[:issuer]`). There is no environment variable, no file and no application config.
+No key, issuer or `typ` has a default.
 Where the keys live between calls is the host's decision.
 
 **Core is a separate package.** `beam_mcp` holds no key and calls no signing primitive; it is

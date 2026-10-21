@@ -47,7 +47,7 @@ defmodule BeamMCP.Signer.COSE do
 
   @behaviour BeamMCP.Signer
 
-  alias BeamMCP.Signer.COSE.CBOR
+  alias BeamMCP.Signer.COSE.{CBOR, Keys}
   alias BeamMCP.Signer.MLDSA87
 
   @single_schema 0xFFFF0003
@@ -56,9 +56,6 @@ defmodule BeamMCP.Signer.COSE do
   @media_type "application/json"
   @alg -50
   @sha384 -43
-  # RFC 9679's thumbprint input for the AKP key {1: 7, 3: -50, -1: pub} under RFC 8949 §4.2.1:
-  # this head, then the 2,592 public-key bytes (N6 profile v0 r3 §5).
-  @thumbprint_prefix <<0xA3, 0x01, 0x07, 0x03, 0x38, 0x31, 0x20, 0x59, 0x0A, 0x20>>
 
   @doc """
   Signs `canonical_bytes` as an N6 statement in the single-signer carrier.
@@ -74,13 +71,13 @@ defmodule BeamMCP.Signer.COSE do
   @impl BeamMCP.Signer
   @spec sign(binary(), keyword()) :: {:ok, binary()} | {:error, term()}
   def sign(canonical_bytes, opts) when is_binary(canonical_bytes) and is_list(opts) do
-    with {:ok, seed} <- fetch(opts, :private_key),
-         {:ok, public} <- fetch(opts, :public_key),
-         {:ok, issuer} <- fetch(opts, :issuer),
-         {:ok, seed} <- read(seed, :private_key),
-         {:ok, public} <- read(public, :public_key),
+    with {:ok, seed} <- Keys.fetch(opts, :private_key, :no_private_key),
+         {:ok, public} <- Keys.fetch(opts, :public_key, :no_public_key),
+         {:ok, issuer} <- Keys.fetch(opts, :issuer, :no_issuer),
+         {:ok, seed} <- Keys.read(seed, :private_key),
+         {:ok, public} <- Keys.read(public, :public_key),
          {:ok, body} <- body(canonical_bytes, issuer),
-         {:ok, protected} <- protected(public),
+         {:ok, protected} <- header(Keys.kid(public)),
          {:ok, to_be_signed} <-
            CBOR.encode(["Signature1", {:bytes, protected}, {:bytes, ""}, {:bytes, body}]),
          {:ok, signature} <-
@@ -94,26 +91,6 @@ defmodule BeamMCP.Signer.COSE do
   end
 
   def sign(_canonical_bytes, _opts), do: {:error, :bad_arguments}
-
-  # The first `{name, value}` entry, walked here for the reason `BeamMCP.Signer.Ed25519` walks its
-  # own: `Keyword.fetch/2` raises, key in view, on an improper list.
-  defp fetch([{name, value} | _], name), do: {:ok, value}
-  defp fetch([_ | rest], name), do: fetch(rest, name)
-  defp fetch([], :private_key), do: {:error, :no_private_key}
-  defp fetch([], :public_key), do: {:error, :no_public_key}
-  defp fetch([], :issuer), do: {:error, :no_issuer}
-  defp fetch(_improper_tail, _name), do: {:error, :bad_arguments}
-
-  # A reference is called once, here, and the bytes go on to MLDSA87, which checks their sizes
-  # and reads them as it reads bytes a host passes; what a function raises, throws or exits is
-  # answered as unreadable, the reason dropped unread.
-  defp read(key, name) when is_function(key, 0) do
-    {:ok, key.()}
-  catch
-    _kind, _reason -> {:error, {name, :unreadable}}
-  end
-
-  defp read(key, _name), do: {:ok, key}
 
   defp body(canonical_bytes, issuer) do
     with {:ok, issuer} <- issuer(issuer) do
@@ -139,13 +116,6 @@ defmodule BeamMCP.Signer.COSE do
   end
 
   defp issuer(_other), do: {:error, {:issuer, :invalid}}
-
-  # The thumbprint needs exactly the 2,592-byte key; any other size is MLDSA87's answer to give,
-  # so a key of the wrong size gets a placeholder kid here and is refused there, before signing.
-  defp protected(public) when is_binary(public) and byte_size(public) == 2592,
-    do: header(:crypto.hash(:sha384, @thumbprint_prefix <> public))
-
-  defp protected(_public), do: header(<<0::384>>)
 
   defp header(kid), do: CBOR.encode(%{1 => @alg, 4 => {:bytes, kid}, 16 => @typ})
 end

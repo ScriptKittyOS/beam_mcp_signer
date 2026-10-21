@@ -7,7 +7,8 @@ SPDX-License-Identifier: Apache-2.0
 
 Three modules, one function each, one dependency direction. Ed25519 is drawn below; ML-DSA-87
 takes the same path with two keys and a check before it returns; COSE builds a statement around
-the bytes and has ML-DSA-87 sign that.
+the bytes and has ML-DSA-87 sign that. A fourth, the hash envelope, sits outside the behaviour
+and has ML-DSA-87 sign a streamed artifact's digest.
 
 ```text
  host application
@@ -55,6 +56,14 @@ the bytes and has ML-DSA-87 sign that.
   them, and returns the N6 single-signer carrier. Its one `:crypto` call is SHA-384; it calls
   no signing primitive. Its encoder, `BeamMCP.Signer.COSE.CBOR` (private), writes
   deterministic CBOR under N6's rules and refuses anything else by name.
+- **`BeamMCP.Signer.COSE.HashEnvelope`** (`lib/beam_mcp/signer/cose/hash_envelope.ex`), outside
+  the behaviour and non-claimed. It takes `sign_digest/2` (a digest the host has) or
+  `sign_stream/2` (any enumerable of binaries, hashed with `:crypto.hash_init/update/final`).
+  It judges every option, the public key and the hash before reading a chunk. It builds the
+  RFC 9995 protected header (`{1: -50, 2: [258], 4: kid, 16: typ, 258, 259, ?260}`), has
+  `BeamMCP.Signer.MLDSA87` sign ToBeSigned over the digest, and returns the same carrier, the
+  digest as its payload. It and COSE share `BeamMCP.Signer.COSE.Keys` (private) for the option
+  walk, the key read and the kid.
 - **`beam_mcp`** (a dependency, `~> 0.7`): defines the behaviour and produces the bytes. It
   holds no key, calls no signing primitive and does not depend on this package.
 - **Erlang/OTP `:crypto`**: performs Ed25519, ML-DSA-87 and SHA-384, through OpenSSL. This

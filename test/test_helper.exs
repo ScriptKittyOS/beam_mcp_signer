@@ -11,6 +11,8 @@ if System.get_env("MLDSA_REQUIRED") == "1" and not mldsa87? do
   raise "MLDSA_REQUIRED=1 and this runtime's :crypto does not offer mldsa87: refused"
 end
 
-ExUnit.start(exclude: if(mldsa87?, do: [:no_mldsa87], else: [:mldsa87]))
+# The 10 GiB test (cose_hash_envelope_ten_gb_test.exs) runs only when asked for: `--only ten_gb`.
+ExUnit.start(exclude: [:ten_gb | if(mldsa87?, do: [:no_mldsa87], else: [:mldsa87])])
 
 Code.require_file("support/strict_cbor.exs", __DIR__)
+Code.require_file("support/hash_envelope_verifier.exs", __DIR__)
